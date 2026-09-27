@@ -1,0 +1,76 @@
+{
+  "name": "aoc-2-multiplayer",
+  "version": "1.2.0",
+  "private": true,
+  "description": "Age of History II multiplayer mod launcher",
+  "author": "AOC 2 Multiplayer",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --publish never",
+    "dist:dir": "electron-builder --win dir --publish never"
+  },
+  "devDependencies": {
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9",
+    "yauzl": "^3.4.0"
+  },
+  "build": {
+    "appId": "ru.aoc2.multiplayer",
+    "productName": "AOC 2 Multiplayer",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "galichan775-hue",
+        "repo": "Launcher-mp",
+        "releaseType": "release"
+      }
+    ],
+    "asar": true,
+    "files": [
+      "app/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "icon": "build/aoc2.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "AOC-2-Multiplayer-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AOC 2 Multiplayer",
+      "installerLanguages": [
+        "en_US",
+        "ru_RU"
+      ],
+      "language": "0x419",
+      "displayLanguageSelector": true,
+      "installerIcon": "build/aoc2.ico",
+      "uninstallerIcon": "build/aoc2.ico",
+      "installerHeaderIcon": "build/aoc2.ico",
+      "installerSidebar": "build/installer-sidebar.bmp",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true,
+      "differentialPackage": false,
+      "uninstallDisplayName": "AOC 2 Multiplayer"
+    }
+  }
+}
