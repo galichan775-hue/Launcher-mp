@@ -858,12 +858,6 @@ function renderConfig(nextConfig) {
 
     const select = () => selectVersion(version.id)
     card.addEventListener('click', select)
-    card.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault()
-        select()
-      }
-    })
     versionGrid.append(card)
   }
   renderCreators()
