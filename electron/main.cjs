@@ -115,8 +115,13 @@ async function applyRepoUpdate() {
   if (!latest || !semverGt(latest, current)) throw new Error('Установленная версия уже актуальна.')
   const dest = path.join(app.getPath('temp'), 'AOC-2-Multiplayer-Setup.exe')
   await downloadFile(RAW_BASE + 'AOC-2-Multiplayer-Setup.exe', dest)
-  const launchError = await shell.openPath(dest)
-  if (launchError) throw new Error(launchError)
+  try {
+    const child = spawn(dest, [], { detached: true, stdio: 'ignore' })
+    child.unref()
+  } catch (error) {
+    throw new Error(`Не удалось запустить установщик: ${error.message}`)
+  }
+  setTimeout(() => app.exit(0), 1500)
   return { started: true, version: latest }
 }
 

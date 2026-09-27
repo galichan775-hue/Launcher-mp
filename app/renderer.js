@@ -103,8 +103,8 @@ const translations = {
     startupReady: 'Готово',
     startupUpdateTitle: 'Доступно обновление',
     startupUpdateText: 'Версия {version} готова к загрузке. Установка займёт несколько секунд.',
-    startupUpdateInstall: 'Обновить',
-    startupUpdateLater: 'Позже',
+    startupUpdateInstall: 'Скачать новое',
+    startupUpdateLater: 'Отказаться',
     startupUpdateDownloading: 'Загружаю обновление {version}...',
     startupUpdateStarted: 'Установщик запущен. Завершите обновление и перезапустите лаунчер.',
     updateDownloading: 'Загружаем обновление лаунчера',
@@ -265,8 +265,8 @@ const translations = {
     startupReady: 'Ready',
     startupUpdateTitle: 'Update available',
     startupUpdateText: 'Version {version} is ready to download. Installing takes only a few seconds.',
-    startupUpdateInstall: 'Update',
-    startupUpdateLater: 'Later',
+    startupUpdateInstall: 'Download new version',
+    startupUpdateLater: 'Decline',
     startupUpdateDownloading: 'Downloading update {version}...',
     startupUpdateStarted: 'Installer started. Finish the update and restart the launcher.',
     updateDownloading: 'Downloading launcher update',
@@ -1635,3 +1635,96 @@ refreshStatus()
 setInterval(refreshStats, 1000)
 runStartupSequence()
 setInterval(checkModUpdates, 30 * 60 * 1000)
+
+;(() => {
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const sidebar = document.querySelector('.sidebar')
+  const indicator = document.getElementById('nav-indicator')
+
+  const placeIndicator = () => {
+    if (!sidebar || !indicator) return
+    const active = sidebar.querySelector('.nav-item.selected')
+    if (!active) return
+    const sidebarBox = sidebar.getBoundingClientRect()
+    const itemBox = active.getBoundingClientRect()
+    indicator.style.height = `${itemBox.height}px`
+    indicator.style.transform = `translateY(${itemBox.top - sidebarBox.top}px)`
+    indicator.classList.add('ready')
+  }
+
+  if (sidebar && indicator) {
+    placeIndicator()
+    requestAnimationFrame(placeIndicator)
+    window.addEventListener('resize', placeIndicator)
+    new MutationObserver(placeIndicator).observe(sidebar, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class']
+    })
+  }
+
+  const rippleTargets = '.button-primary, .soft-button, .startup-update-actions button, .language-option, .nav-item'
+  document.addEventListener('pointerdown', event => {
+    if (reduceMotion) return
+    const host = event.target.closest(rippleTargets)
+    if (!host) return
+    const box = host.getBoundingClientRect()
+    const size = Math.max(box.width, box.height)
+    const drop = document.createElement('span')
+    drop.className = 'ripple'
+    drop.style.width = `${size}px`
+    drop.style.height = `${size}px`
+    drop.style.left = `${event.clientX - box.left - size / 2}px`
+    drop.style.top = `${event.clientY - box.top - size / 2}px`
+    host.append(drop)
+    drop.addEventListener('animationend', () => drop.remove())
+  })
+
+  const hero = document.querySelector('.version-hero')
+  if (hero && !reduceMotion) {
+    let frame = 0
+    hero.addEventListener('pointermove', event => {
+      if (frame) return
+      frame = requestAnimationFrame(() => {
+        frame = 0
+        const box = hero.getBoundingClientRect()
+        const x = (event.clientX - box.left) / box.width - 0.5
+        const y = (event.clientY - box.top) / box.height - 0.5
+        hero.style.setProperty('--v2-mx', (x * 2).toFixed(3))
+        hero.style.setProperty('--v2-my', (y * 2).toFixed(3))
+      })
+    })
+    hero.addEventListener('pointerleave', () => {
+      hero.style.setProperty('--v2-mx', '0')
+      hero.style.setProperty('--v2-my', '0')
+    })
+  }
+
+  const revealTargets = '.commit-row, .screenshot-card, .about-mod-panel, .community-panel'
+  const revealAll = () => {
+    document.querySelectorAll(revealTargets).forEach(node => node.classList.add('in-view'))
+  }
+  if (reduceMotion || typeof IntersectionObserver !== 'function') {
+    revealAll()
+  } else {
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return
+        entry.target.style.transitionDelay = `${Math.min(entry.target.dataset.v2Index || 0, 8) * 45}ms`
+        entry.target.classList.add('in-view')
+        observer.unobserve(entry.target)
+      })
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 })
+    const observeReveals = () => {
+      document.querySelectorAll(revealTargets).forEach((node, index) => {
+        if (node.dataset.v2Bound) return
+        node.dataset.v2Bound = '1'
+        node.dataset.v2Index = String(index)
+        node.classList.add('reveal')
+        observer.observe(node)
+      })
+    }
+    observeReveals()
+    setTimeout(revealAll, 10000)
+  }
+})()

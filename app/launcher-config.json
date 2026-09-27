@@ -53,36 +53,6 @@
         "changed": [],
         "removed": []
       }
-    },
-    {
-      "id": "aoh2mp-1.9.3",
-      "version": "1.9.3",
-      "name": "AoH2MP 1.9.3",
-      "tagline": "Отдельная версия AoH2MP",
-      "taglineEn": "Standalone AoH2MP version",
-      "description": "AoH2MP 1.9.3\n\nОписание версии можно изменить в app/launcher-config.json.",
-      "descriptionEn": "AoH2MP 1.9.3\n\nEdit this version description in app/launcher-config.json.",
-      "repository": "galichan775-hue/1.9.3-mp",
-      "commit": "e8143197a36b482974e3dc19c5661b2977214c49",
-      "banner": "assets/versions/1.9.3-mp/banner.png",
-      "icon": "assets/branding/logo.svg",
-      "screenshots": [],
-      "changes": { "added": [], "changed": [], "removed": [] }
-    },
-    {
-      "id": "aoh2mp-1.9.4",
-      "version": "1.9.4",
-      "name": "AoH2MP 1.9.4",
-      "tagline": "Отдельная версия AoH2MP",
-      "taglineEn": "Standalone AoH2MP version",
-      "description": "AoH2MP 1.9.4\n\nОписание версии можно изменить в app/launcher-config.json.",
-      "descriptionEn": "AoH2MP 1.9.4\n\nEdit this version description in app/launcher-config.json.",
-      "repository": "galichan775-hue/1.9.4-mp",
-      "commit": "8f811121fb3425f9104fdfd6d125007a8d7ad9fb",
-      "banner": "assets/versions/1.9.4-mp/banner.png",
-      "icon": "assets/branding/logo.svg",
-      "screenshots": [],
-      "changes": { "added": [], "changed": [], "removed": [] }
     }
   ]
 }
