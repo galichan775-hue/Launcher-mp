@@ -549,11 +549,22 @@ body {
 .startup-screen>span { position: relative; min-height: 16px; color: #b8bdc8; font-size: 11px; }
 .startup-track { position: relative; width: 170px; height: 3px; margin-top: 4px; overflow: hidden; border-radius: 4px; background: #ffffff19; }
 .startup-track i { display: block; width: 38%; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#929cac,#f0f2f5); animation: startup-loading 1.2s ease-in-out infinite; }
+.startup-update { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 292px; margin-top: 10px; padding: 15px 17px; border: 1px solid #ffffff1f; border-radius: 14px; background: #1d2129b8; box-shadow: 0 16px 40px #0b0d1299; animation: startup-rise .34s ease both; }
+.startup-update>b { font-size: 13px; font-weight: 600; letter-spacing: .2px; color: #f2f4f8; }
+.startup-update>span { min-height: 14px; color: #aeb4c1; font-size: 11px; text-align: center; }
+.startup-update-actions { display: flex; gap: 8px; margin-top: 5px; }
+.startup-update-actions button { min-width: 104px; height: 30px; padding: 0 15px; border: 1px solid transparent; border-radius: 9px; font-family: inherit; font-size: 11px; font-weight: 500; cursor: pointer; transition: background .16s ease,border-color .16s ease,color .16s ease; }
+.startup-update-primary { background: linear-gradient(118deg,#aab6ca,#f0e0c8 52%,#c4a7a6); color: #1b1d22; }
+.startup-update-primary:hover:not(:disabled) { background: linear-gradient(118deg,#bcc7d8,#f7ead6 52%,#d2b6b4); }
+.startup-update-primary:disabled { opacity: .55; cursor: default; }
+.startup-update-secondary { border-color: #ffffff24; background: #ffffff0f; color: #ccd1db; }
+.startup-update-secondary:hover { background: #ffffff1c; color: #f2f4f8; }
 .startup-window-controls { position: absolute; top: 10px; right: 12px; display: flex; gap: 5px; -webkit-app-region: no-drag; }
 .startup-window-controls button { font-size: 19px; }
 @keyframes startup-loading { from { transform: translateX(-110%); } to { transform: translateX(370%); } }
 @keyframes startup-pulse { from { opacity: .45; transform: scale(.85); } to { opacity: .9; transform: scale(1.15); } }
 @keyframes startup-float { 50% { transform: translateY(-5px); } }
+@keyframes startup-rise { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
 .profile-button { min-height: 50px; border-radius: 10px; transition: background .15s ease; }
 .profile-button:hover { background: #ffffff09; }
 .profile-avatar { flex: 0 0 33px; overflow: hidden; }

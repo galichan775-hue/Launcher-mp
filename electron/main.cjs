@@ -77,47 +77,47 @@ function semverGt(a, b) {
   return false
 }
 
+async function resolveRemoteVersion(local) {
+  const candidates = [
+    'update/latest.txt',
+    'latest.txt',
+    `v${local}.txt`,
+    `${local}.txt`
+  ]
+  for (const candidate of candidates) {
+    try {
+      const text = (await fetchText(RAW_BASE + candidate)).trim()
+      if (text) return text.replace(/^v/, '').trim()
+    } catch (e) {
+      // ignore and try next
+    }
+  }
+  return null
+}
+
+// Reports the repository version without any native dialog: the renderer shows the prompt
+// inside the launcher window so it keeps the app typography instead of the Windows theme.
 async function checkRepoUpdate() {
+  const current = app.getVersion()
+  if (!app.isPackaged) return { supported: false, current, latest: null, available: false }
   try {
-    const local = app.getVersion()
-    const candidates = [
-      'update/latest.txt',
-      'latest.txt',
-      `v${local}.txt`,
-      `${local}.txt`
-    ]
-    let remote = null
-    for (const candidate of candidates) {
-      try {
-        const text = (await fetchText(RAW_BASE + candidate)).trim()
-        if (text) { remote = text; break }
-      } catch (e) {
-        // ignore and try next
-      }
-    }
-    if (!remote) return
-    remote = remote.replace(/^v/, '').trim()
-    if (semverGt(remote, local)) {
-      const installerUrl = RAW_BASE + 'AOC-2-Multiplayer-Setup.exe'
-      const result = await dialog.showMessageBox({
-        type: 'info',
-        message: `Найдена версия ${remote}. Скачать и установить?`,
-        buttons: ['Да', 'Нет']
-      })
-      if (result.response === 0) {
-        try {
-          const dest = path.join(app.getPath('temp'), 'AOC-2-Multiplayer-Setup.exe')
-          await downloadFile(installerUrl, dest)
-          await shell.openPath(dest)
-        } catch (e) {
-          console.error('Could not download or run installer:', e)
-          dialog.showMessageBox({ type: 'error', message: 'Не удалось скачать или запустить установщик.' })
-        }
-      }
-    }
+    const latest = await resolveRemoteVersion(current)
+    return { supported: true, current, latest, available: Boolean(latest) && semverGt(latest, current) }
   } catch (error) {
     console.error('Repository update check failed:', error)
+    return { supported: true, current, latest: null, available: false }
   }
+}
+
+async function applyRepoUpdate() {
+  const current = app.getVersion()
+  const latest = await resolveRemoteVersion(current)
+  if (!latest || !semverGt(latest, current)) throw new Error('Установленная версия уже актуальна.')
+  const dest = path.join(app.getPath('temp'), 'AOC-2-Multiplayer-Setup.exe')
+  await downloadFile(RAW_BASE + 'AOC-2-Multiplayer-Setup.exe', dest)
+  const launchError = await shell.openPath(dest)
+  if (launchError) throw new Error(launchError)
+  return { started: true, version: latest }
 }
 
 // --- end repo-based updater ---
@@ -889,6 +889,8 @@ ipcMain.handle('launcher:check-updates', async () => {
 ipcMain.handle('launcher:install-update', () => {
   autoUpdater.quitAndInstall()
 })
+ipcMain.handle('launcher:check-repo-update', () => checkRepoUpdate())
+ipcMain.handle('launcher:apply-repo-update', () => applyRepoUpdate())
 ipcMain.handle('window:minimize', event => {
   BrowserWindow.fromWebContents(event.sender)?.minimize()
 })
@@ -1375,8 +1377,8 @@ app.whenReady().then(() => {
   readGameLocations()
   readGameStats()
   readVersionCommits()
-  // check repository-based version file and prompt installer if newer
-  checkRepoUpdate().catch(() => {})
+  // The repository version check runs from the renderer startup sequence so the prompt is
+  // rendered inside the launcher window instead of a native Windows message box.
   createWindow()
   setInterval(() => checkpointGameSessions().catch(error => {
     console.error('Could not checkpoint playtime statistics:', error)

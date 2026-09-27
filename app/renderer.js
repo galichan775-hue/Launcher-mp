@@ -101,6 +101,12 @@ const translations = {
     startupLoadingVersions: 'Загрузка версий...',
     startupCheckingUpdates: 'Проверка обновлений...',
     startupReady: 'Готово',
+    startupUpdateTitle: 'Доступно обновление',
+    startupUpdateText: 'Версия {version} готова к загрузке. Установка займёт несколько секунд.',
+    startupUpdateInstall: 'Обновить',
+    startupUpdateLater: 'Позже',
+    startupUpdateDownloading: 'Загружаю обновление {version}...',
+    startupUpdateStarted: 'Установщик запущен. Завершите обновление и перезапустите лаунчер.',
     updateDownloading: 'Загружаем обновление лаунчера',
     updateReady: 'Обновление лаунчера загружено. Перезапусти лаунчер для установки.',
     updateInstall: 'Перезапустить и обновить',
@@ -257,6 +263,12 @@ const translations = {
     startupLoadingVersions: 'Loading versions...',
     startupCheckingUpdates: 'Checking for updates...',
     startupReady: 'Ready',
+    startupUpdateTitle: 'Update available',
+    startupUpdateText: 'Version {version} is ready to download. Installing takes only a few seconds.',
+    startupUpdateInstall: 'Update',
+    startupUpdateLater: 'Later',
+    startupUpdateDownloading: 'Downloading update {version}...',
+    startupUpdateStarted: 'Installer started. Finish the update and restart the launcher.',
     updateDownloading: 'Downloading launcher update',
     updateReady: 'Launcher update downloaded. Restart to install it.',
     updateInstall: 'Restart and update',
@@ -319,6 +331,7 @@ const pages = Object.fromEntries(
 const versionGrid = document.getElementById('version-grid')
 const versionStates = new Map()
 const versionUpdates = new Map()
+let pendingRepoUpdate = null
 const toast = document.getElementById('toast')
 const notificationStack = document.getElementById('notification-stack')
 let config
@@ -685,6 +698,15 @@ document.getElementById('check-launcher-update').addEventListener('click', async
     const result = await window.aocLauncher.checkForUpdates()
     if (result?.supported === false) {
       label.textContent = 'Dev build'
+      return
+    }
+    // electron-updater needs a published GitHub Release; fall back to the repository version file
+    // so the button still works when the update is only pushed to the repository.
+    const repo = await window.aocLauncher.checkRepoUpdate().catch(() => null)
+    if (repo?.available) {
+      pendingRepoUpdate = repo
+      document.querySelector('#update-dialog p').textContent = t('startupUpdateText', { version: repo.latest })
+      document.getElementById('update-dialog').showModal()
       return
     }
     const updateStatus = document.getElementById('launcher-update-message')
@@ -1433,7 +1455,26 @@ for (const id of ['window-minimize', 'startup-minimize']) {
 for (const id of ['window-close', 'startup-close']) {
   document.getElementById(id).addEventListener('click', () => window.aocLauncher.closeWindow())
 }
-document.getElementById('install-update').addEventListener('click', () => window.aocLauncher.installUpdate())
+document.getElementById('install-update').addEventListener('click', async () => {
+  if (pendingRepoUpdate) {
+    const update = pendingRepoUpdate
+    pendingRepoUpdate = null
+    document.getElementById('update-dialog').close()
+    const button = document.getElementById('startup-update-install')
+    const startupMessage = document.getElementById('startup-message')
+    if (button) button.disabled = true
+    if (startupMessage) startupMessage.textContent = t('startupUpdateDownloading', { version: update.latest })
+    try {
+      await window.aocLauncher.applyRepoUpdate()
+      if (startupMessage) startupMessage.textContent = t('startupUpdateStarted')
+    } catch (error) {
+      if (button) button.disabled = false
+      notify(error.message || t('updateError'), true)
+    }
+    return
+  }
+  window.aocLauncher.installUpdate()
+})
 document.getElementById('later-update').addEventListener('click', () => document.getElementById('update-dialog').close())
 document.getElementById('close-crash-dialog').addEventListener('click', () => document.getElementById('crash-dialog').close())
 document.getElementById('create-crash-report').addEventListener('click', async () => {
@@ -1522,6 +1563,43 @@ window.aocLauncher.onUpdateStatus(status => {
   }
 })
 
+function hideStartupScreen() {
+  const startupScreen = document.getElementById('startup-screen')
+  if (!startupScreen) return
+  startupScreen.classList.add('startup-screen-leaving')
+  setTimeout(() => startupScreen.remove(), 650)
+}
+
+function showStartupUpdate(update) {
+  pendingRepoUpdate = update
+  document.getElementById('startup-update-title').textContent = t('startupUpdateTitle')
+  document.getElementById('startup-update-text').textContent = t('startupUpdateText', { version: update.latest })
+  document.getElementById('startup-update-install').textContent = t('startupUpdateInstall')
+  document.getElementById('startup-update-later').textContent = t('startupUpdateLater')
+  document.getElementById('startup-update').hidden = false
+  // The load is finished, so drop the spinner and the stale "checking for updates" caption.
+  const track = document.querySelector('.startup-track')
+  if (track) track.hidden = true
+  const startupMessage = document.getElementById('startup-message')
+  if (startupMessage) startupMessage.textContent = ''
+}
+
+document.getElementById('startup-update-install').addEventListener('click', async () => {
+  if (!pendingRepoUpdate) return
+  const button = document.getElementById('startup-update-install')
+  const startupMessage = document.getElementById('startup-message')
+  button.disabled = true
+  startupMessage.textContent = t('startupUpdateDownloading', { version: pendingRepoUpdate.latest })
+  try {
+    await window.aocLauncher.applyRepoUpdate()
+    startupMessage.textContent = t('startupUpdateStarted')
+  } catch (error) {
+    button.disabled = false
+    notify(error.message || t('updateError'), true)
+  }
+})
+document.getElementById('startup-update-later').addEventListener('click', hideStartupScreen)
+
 async function runStartupSequence() {
   const startupMessage = document.getElementById('startup-message')
   const startedAt = Date.now()
@@ -1539,16 +1617,23 @@ async function runStartupSequence() {
   const updateCheck = window.aocLauncher.checkForUpdates().catch(error => {
     console.warn('Launcher update check failed:', error)
   })
+  const repoUpdateCheck = window.aocLauncher.checkRepoUpdate().catch(error => {
+    console.warn('Repository update check failed:', error)
+    return null
+  })
   await Promise.race([
     Promise.all([versionsReady, updateCheck, modUpdates]),
     wait(8000)
   ])
+  const repoUpdate = await Promise.race([repoUpdateCheck, wait(3500).then(() => null)])
+  if (repoUpdate?.available) {
+    showStartupUpdate(repoUpdate)
+    return
+  }
   startupMessage.textContent = t('startupReady')
   const remaining = minimumDuration - (Date.now() - startedAt)
   if (remaining > 0) await wait(remaining)
-  const startupScreen = document.getElementById('startup-screen')
-  startupScreen.classList.add('startup-screen-leaving')
-  setTimeout(() => startupScreen.remove(), 650)
+  hideStartupScreen()
 }
 
 renderProfile()

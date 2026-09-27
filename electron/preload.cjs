@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('aocLauncher', Object.freeze({
   downloadJava: () => ipcRenderer.invoke('launcher:download-java'),
   checkForUpdates: () => ipcRenderer.invoke('launcher:check-updates'),
   installUpdate: () => ipcRenderer.invoke('launcher:install-update'),
+  checkRepoUpdate: () => ipcRenderer.invoke('launcher:check-repo-update'),
+  applyRepoUpdate: () => ipcRenderer.invoke('launcher:apply-repo-update'),
   minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
   closeWindow: () => ipcRenderer.invoke('window:close'),
   openLaunchLog: versionId => ipcRenderer.invoke('launcher:open-launch-log', versionId),
