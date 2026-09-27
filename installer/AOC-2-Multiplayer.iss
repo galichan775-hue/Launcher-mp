@@ -1,5 +1,5 @@
 #define MyAppName "AOC 2 Multiplayer"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.2.1"
 #define MyAppPublisher "AOC 2 Multiplayer"
 #define MyAppExeName "AOC 2 Multiplayer.exe"
 #define BuildAppDir "..\dist\win-unpacked"
@@ -17,7 +17,7 @@ DefaultDirName={localappdata}\Programs\AOC 2 Multiplayer
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
-OutputDir=..\dist\inno
+OutputDir=..\dist
 OutputBaseFilename=AOC-2-Multiplayer-Inno-Setup
 Compression=lzma2
 SolidCompression=yes

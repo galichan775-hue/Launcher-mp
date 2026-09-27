@@ -66,6 +66,8 @@ const translations = {
     gameExitedError: 'Игра завершилась с ошибкой: {error}',
     launchLogSaved: 'Подробности запуска сохранены. Открой журнал запуска для диагностики.',
     openLaunchLog: 'Журнал запуска',
+    openLastCrash: 'Лог последнего краша',
+    noCrashFound: 'Крашей не найдено',
     profileImageError: 'Не удалось загрузить это изображение. Выбери PNG, JPEG, WebP или GIF.',
     installedMessage: 'Bloody Europe 1.9.3 установлена',
     deletedMessage: 'Bloody Europe 1.9.3 удалена',
@@ -95,6 +97,10 @@ const translations = {
     language: 'Язык интерфейса',
     stoppingGame: 'Останавливаю игру…',
     updateChecking: 'Проверка обновления...',
+    startupInitializing: 'Инициализация...',
+    startupLoadingVersions: 'Загрузка версий...',
+    startupCheckingUpdates: 'Проверка обновлений...',
+    startupReady: 'Готово',
     updateDownloading: 'Загружаем обновление лаунчера',
     updateReady: 'Обновление лаунчера загружено. Перезапусти лаунчер для установки.',
     updateInstall: 'Перезапустить и обновить',
@@ -116,6 +122,22 @@ const translations = {
     crashSubject: 'Тема',
     crashDetails: 'Что произошло?',
     crashCreateReport: 'Сохранить отчет с логом',
+    crashSendReport: 'Сообщить об ошибке',
+    crashReportCopied: 'Текст ошибки скопирован. Вставь его в чат и прикрепи файл журнала.',
+    crashOpenLogFolder: 'Открыть папку с логом',
+    updateAvailable: 'Доступно обновление',
+    updateMod: 'Обновить',
+    rollback: 'Откатиться',
+    installed: 'Установлена',
+    modUpdatesFound: 'Доступны обновления модов: {count}.',
+    updateConfirmVersion: 'Обновить {name} до последнего коммита? {message}',
+    rollbackConfirmVersion: 'Установить {name} на коммит {short}? Текущая папка сохранится как .bak.',
+    rollbackBackupCreated: 'Резервная копия: {path}',
+    commitsLoading: 'Загружаю историю коммитов...',
+    commitsUnavailable: 'История коммитов недоступна.',
+    commitsNoInstalledVersions: 'Сначала установи хотя бы одну версию мода.',
+    manageModVersions: 'Управление версиями мода',
+    manageModVersionsDescription: 'Выбери коммит из истории репозитория, чтобы установить или откатить мод на нужную версию. Текущая папка сохраняется как резервная копия .bak.',
     crashAttachHint: 'После сохранения прикрепи отчет к сообщению в Discord поддержки.',
     reportSaved: 'Отчет сохранен. Прикрепи файл к сообщению в Discord.',
     archiveTooLarge: 'Архив слишком большой (больше 1 ГБ) и не будет распакован.',
@@ -200,6 +222,8 @@ const translations = {
     gameExitedError: 'The game exited with an error: {error}',
     launchLogSaved: 'Launch details were saved. Open the launch log to diagnose the problem.',
     openLaunchLog: 'Launch log',
+    openLastCrash: 'Last crash log',
+    noCrashFound: 'No crashes found',
     profileImageError: 'Could not load this image. Choose PNG, JPEG, WebP, or GIF.',
     installedMessage: 'Bloody Europe 1.9.3 installed',
     deletedMessage: 'Bloody Europe 1.9.3 removed',
@@ -229,6 +253,10 @@ const translations = {
     language: 'Interface language',
     stoppingGame: 'Stopping the game…',
     updateChecking: 'Checking for updates...',
+    startupInitializing: 'Initializing...',
+    startupLoadingVersions: 'Loading versions...',
+    startupCheckingUpdates: 'Checking for updates...',
+    startupReady: 'Ready',
     updateDownloading: 'Downloading launcher update',
     updateReady: 'Launcher update downloaded. Restart to install it.',
     updateInstall: 'Restart and update',
@@ -250,6 +278,22 @@ const translations = {
     crashSubject: 'Subject',
     crashDetails: 'What happened?',
     crashCreateReport: 'Save report with log',
+    crashSendReport: 'Report the error',
+    crashReportCopied: 'The error text is copied. Paste it into the chat and attach the log file.',
+    crashOpenLogFolder: 'Open log folder',
+    updateAvailable: 'Update available',
+    updateMod: 'Update',
+    rollback: 'Roll back',
+    installed: 'Installed',
+    modUpdatesFound: 'Mod updates available: {count}.',
+    updateConfirmVersion: 'Update {name} to the latest commit? {message}',
+    rollbackConfirmVersion: 'Install {name} from commit {short}? The current folder is kept as .bak.',
+    rollbackBackupCreated: 'Backup: {path}',
+    commitsLoading: 'Loading commit history...',
+    commitsUnavailable: 'Commit history is unavailable.',
+    commitsNoInstalledVersions: 'Install at least one mod version first.',
+    manageModVersions: 'Manage mod versions',
+    manageModVersionsDescription: 'Pick a commit from the repository history to install or roll the mod back. The current folder is kept as a .bak backup.',
     crashAttachHint: 'After saving, attach the report to your support Discord message.',
     reportSaved: 'Report saved. Attach the file to your Discord message.',
     archiveTooLarge: 'The archive is larger than 1 GB and cannot be extracted.',
@@ -274,6 +318,7 @@ const pages = Object.fromEntries(
 )
 const versionGrid = document.getElementById('version-grid')
 const versionStates = new Map()
+const versionUpdates = new Map()
 const toast = document.getElementById('toast')
 const notificationStack = document.getElementById('notification-stack')
 let config
@@ -327,51 +372,13 @@ function showCrashDialog(error) {
     ? `${selectedVersion.name}: ${language === 'en' ? 'launch failed' : 'ошибка запуска'}`
     : t('crashTitle')
   document.getElementById('crash-details').value = error || ''
-  const dialog = document.getElementById('crash-dialog')
-  if (!dialog.open) dialog.showModal()
-  const reportButton = document.getElementById('report-crash-to-telegram')
-  if (reportButton) {
-    reportButton.onclick = async () => {
-      try {
-        const logPath = await window.aocLauncher.getLastCrashLog?.() || null
-        const text = `${document.getElementById('crash-subject').value}\n\n${document.getElementById('crash-details').value}\n\nЛог: ${logPath || 'не найден'}`
-        await navigator.clipboard.writeText(text)
-        const copied = document.getElementById('crash-telegram-copy-note')
-        if (copied) copied.hidden = false
-        await window.aocLauncher.openExternal('https://t.me/communityAOC2mp/2682')
-      } catch (error) {
-        notify(error.message || 'Не удалось подготовить репорт в Telegram', true)
-      }
-    }
-  }
+  document.getElementById('crash-dialog').showModal()
 }
 
 function showMessage(title, message) {
   document.getElementById('message-title').textContent = title
   document.getElementById('message-body').textContent = message
   document.getElementById('message-dialog').showModal()
-}
-
-function ensureNotificationStyles() {
-  if (document.querySelector('.notification-card')) return
-  const style = document.createElement('style')
-  style.textContent = `
-    .notification-stack { position: fixed; right: 22px; bottom: 22px; z-index: 90; display: flex; flex-direction: column; gap: 12px; width: min(360px, calc(100vw - 32px)); }
-    .notification-card { position: relative; display: grid; grid-template-columns: 20px minmax(0,1fr) 24px; gap: 11px; align-items: center; min-height: 72px; padding: 12px 12px 10px 12px; border: 1px solid rgba(255,255,255,.12); border-radius: 14px; background: rgba(30,32,38,.72); backdrop-filter: blur(20px) saturate(140%); box-shadow: 0 20px 50px #0008; opacity: 0; transform: translateY(10px) scale(.98); transition: opacity 200ms ease-out, transform 200ms ease-out; }
-    .notification-card.visible { opacity: 1; transform: translateY(0) scale(1); }
-    .notification-card.notification-error { border-color: rgba(255,96,85,.3); }
-    .notification-icon { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: rgba(255,255,255,.06); color: var(--accent); font-size: 12px; font-weight: 700; }
-    .notification-error .notification-icon { background: rgba(255,100,80,.14); color: #ffb4aa; }
-    .notification-copy { display: grid; gap: 3px; min-width: 0; }
-    .notification-copy strong { color: var(--text); font-size: 12px; }
-    .notification-copy span { color: rgba(255,255,255,.68); font-size: 10px; line-height: 1.5; word-break: break-word; }
-    .notification-close { width: 24px; height: 24px; border: 0; border-radius: 7px; background: transparent; color: rgba(255,255,255,.7); font-size: 16px; cursor: pointer; }
-    .notification-close:hover { background: rgba(255,255,255,.06); }
-    .notification-progress { position: absolute; left: 12px; right: 12px; bottom: 0; height: 3px; border-radius: 0 0 12px 12px; background: linear-gradient(90deg, rgba(214,220,228,.9), rgba(214,220,228,.45)); transform-origin: left center; animation: notification-progress 5.2s linear forwards; }
-    .notification-error .notification-progress { background: linear-gradient(90deg,#ff9e7c,#ff6c6c); }
-    @keyframes notification-progress { from { transform: scaleX(1); } to { transform: scaleX(0); } }
-  `
-  document.head.append(style)
 }
 
 document.addEventListener('copy', event => {
@@ -396,7 +403,6 @@ function icon(name, className = 'icon') {
 }
 
 function notify(message, error = false) {
-  ensureNotificationStyles()
   const item = document.createElement('div')
   item.className = `notification-card ${error ? 'notification-error' : 'notification-info'}`
   item.dataset.id = String(++notificationIdSeed)
@@ -415,11 +421,7 @@ function notify(message, error = false) {
   close.className = 'notification-close'
   close.setAttribute('aria-label', 'Закрыть уведомление')
   close.textContent = '×'
-  close.addEventListener('click', () => {
-    clearTimeout(item.dataset.timeoutId)
-    item.classList.remove('visible')
-    setTimeout(() => item.remove(), 220)
-  })
+  close.addEventListener('click', () => item.remove())
   const bar = document.createElement('span')
   bar.className = 'notification-progress'
   item.append(icon, content, close, bar)
@@ -427,9 +429,9 @@ function notify(message, error = false) {
   requestAnimationFrame(() => item.classList.add('visible'))
   const timeout = setTimeout(() => {
     item.classList.remove('visible')
-    setTimeout(() => item.remove(), 220)
+    setTimeout(() => item.remove(), 260)
   }, 5200)
-  item.dataset.timeoutId = String(timeout)
+  item.dataset.timeout = String(timeout)
   return item
 }
 
@@ -510,6 +512,7 @@ function navigate(name) {
   })
   const key = name === 'library' ? 'versions' : name === 'screenshots' ? 'aboutMod' : 'settings'
   document.getElementById('current-section').textContent = t(key)
+  if (name === 'settings') renderCommitList()
 }
 
 document.querySelectorAll('.nav-item').forEach((button) => {
@@ -665,20 +668,14 @@ document.getElementById('open-launch-log').addEventListener('click', async () =>
     notify(error.message || t('launchError'), true)
   }
 })
-
-document.getElementById('open-last-crash-log').addEventListener('click', async () => {
+document.getElementById('open-last-crash').addEventListener('click', async () => {
   try {
-    const logPath = await window.aocLauncher.getLastCrashLog?.() || null
-    if (!logPath) {
-      notify('Крашей не было', true)
-      return
-    }
-    await window.aocLauncher.openCrashLog?.(logPath)
+    const result = await window.aocLauncher.openLastCrash()
+    if (!result || !result.opened) notify(t('noCrashFound'), true)
   } catch (error) {
-    notify(error.message || 'Не удалось открыть лог последнего падения', true)
+    notify(error.message || t('noCrashFound'), true)
   }
 })
-
 document.getElementById('check-launcher-update').addEventListener('click', async () => {
   const button = document.getElementById('check-launcher-update')
   const label = button.querySelector('.launcher-update-button-label')
@@ -692,8 +689,7 @@ document.getElementById('check-launcher-update').addEventListener('click', async
     }
     const updateStatus = document.getElementById('launcher-update-message')
     if (updateStatus?.textContent) {
-      const normalized = updateStatus.textContent.toLowerCase()
-      label.textContent = normalized.includes('актуальна') || normalized.includes('latest') || normalized.includes('up to date') ? '✓' : 'v' + (result?.version || '…')
+      label.textContent = updateStatus.textContent.includes('актуальна') || updateStatus.textContent.includes('latest') ? '✓' : 'v' + (result?.version || '…')
     } else {
       label.textContent = '✓'
     }
@@ -707,50 +703,6 @@ document.getElementById('check-launcher-update').addEventListener('click', async
     }, 1400)
   }
 })
-
-async function loadVersionHistory() {
-  const list = document.getElementById('version-history-list')
-  if (!list || !selectedVersion) {
-    return
-  }
-  list.replaceChildren()
-  try {
-    const history = await window.aocLauncher.getVersionHistory?.(selectedVersion.id)
-    if (!Array.isArray(history) || !history.length) {
-      list.innerHTML = '<div class="version-history-item"><div class="version-history-meta"><strong>История недоступна</strong><span>Нет данных GitHub для этой версии.</span></div></div>'
-      return
-    }
-    for (const item of history) {
-      const entry = document.createElement('div')
-      entry.className = 'version-history-item'
-      const meta = document.createElement('div')
-      meta.className = 'version-history-meta'
-      const title = document.createElement('strong')
-      title.textContent = item.message || 'Update'
-      const date = document.createElement('span')
-      date.textContent = item.date ? new Date(item.date).toLocaleString('ru-RU', { dateStyle: 'medium', timeStyle: 'short' }) : '—'
-      meta.append(title, date)
-
-      const rollback = document.createElement('button')
-      rollback.type = 'button'
-      rollback.className = 'soft-button'
-      rollback.textContent = 'Откатиться'
-      rollback.addEventListener('click', async () => {
-        try {
-          await window.aocLauncher.rollbackVersion?.(selectedVersion.id, item.sha)
-          notify('Версия откатана к выбранному коммиту')
-          await refreshStatus()
-        } catch (error) {
-          notify(error.message || 'Не удалось откатить версию', true)
-        }
-      })
-      entry.append(meta, rollback)
-      list.append(entry)
-    }
-  } catch (error) {
-    list.innerHTML = '<div class="version-history-item"><div class="version-history-meta"><strong>История недоступна</strong><span>Не удалось загрузить коммиты.</span></div></div>'
-  }
-}
 
 function createLink(label, url) {
   const item = document.createElement(url ? 'a' : 'span')
@@ -866,15 +818,18 @@ function renderConfig(nextConfig) {
     cardTime.textContent = versionStats ? formatPlaytime(versionStats.playSeconds) : formatPlaytime(0)
     const cardStatus = document.createElement('span')
     cardStatus.className = 'card-status'
-    cardStatus.textContent = versionStates.get(version.id)?.searching
-      ? t('searchingGame')
-      : versionStates.get(version.id)?.installed
-      ? versionStates.get(version.id)?.stats?.running
-        ? t('playing')
-        : (language === 'en' ? 'Installed' : 'Установлена')
-      : /^[a-f0-9]{40}$/i.test(version.commit || '')
-        ? (language === 'en' ? 'Ready to install' : 'Готова к установке')
-        : t('versionNotPublished')
+    cardStatus.textContent = versionUpdates.get(version.id)?.available
+      ? t('updateAvailable')
+      : versionStates.get(version.id)?.searching
+        ? t('searchingGame')
+        : versionStates.get(version.id)?.installed
+          ? versionStates.get(version.id)?.stats?.running
+            ? t('playing')
+            : (language === 'en' ? 'Installed' : 'Установлена')
+          : /^[a-f0-9]{40}$/i.test(version.commit || '')
+            ? (language === 'en' ? 'Ready to install' : 'Готова к установке')
+            : t('versionNotPublished')
+    if (versionUpdates.get(version.id)?.available) card.classList.add('has-update')
     footer.append(cardTime, cardStatus)
     content.append(header, creatorLine, description, metadata, footer)
     card.append(art, content)
@@ -911,7 +866,7 @@ function formatLastPlayed(isoDate) {
   return t('daysAgo', { count: Math.floor(hours / 24) })
 }
 
-async function renderVersionDetails(version) {
+function renderVersionDetails(version) {
   if (!version) return
   const installed = versionStates.get(version.id)?.installed || false
   const stats = versionStates.get(version.id)?.stats || { playSeconds: 0, lastPlayed: null, sessions: 0 }
@@ -942,29 +897,33 @@ async function renderVersionDetails(version) {
   }
   screenshots.hidden = version.screenshots.length === 0
   document.getElementById('delete-mod').hidden = !installed || Boolean(versionStates.get(version.id)?.external)
+  renderVersionUpdateState()
+}
 
-  const actionArea = document.getElementById('version-update-actions')
-  actionArea.replaceChildren()
-  const updateList = await window.aocLauncher.getVersionUpdates?.().catch(() => [])
-  const versionUpdate = Array.isArray(updateList) ? updateList.find(item => item.id === version.id) : null
-  if (versionUpdate?.available) {
-    const badge = document.createElement('span')
-    badge.className = 'version-update-badge'
-    badge.textContent = 'Доступно обновление'
-    const button = document.createElement('button')
-    button.type = 'button'
-    button.className = 'soft-button version-update-button'
-    button.textContent = 'Обновить'
-    button.addEventListener('click', async () => {
-      try {
-        await window.aocLauncher.downloadMod(version.id)
-        await refreshStatus()
-        notify('Обновление скачано и установлено')
-      } catch (error) {
-        notify(error.message || 'Не удалось обновить версию', true)
-      }
-    })
-    actionArea.append(badge, button)
+function renderVersionUpdateState() {
+  const badge = document.getElementById('version-update-badge')
+  const button = document.getElementById('update-mod')
+  if (!selectedVersion || !badge || !button) return
+  const update = versionUpdates.get(selectedVersion.id)
+  const state = versionStates.get(selectedVersion.id) || { installed: false }
+  const available = Boolean(update?.available)
+  badge.hidden = !available
+  button.hidden = !available
+  button.disabled = busy || state.stats?.running
+  if (available) {
+    button.title = update.message || ''
+  }
+}
+
+async function checkModUpdates() {
+  try {
+    const updates = await window.aocLauncher.checkModUpdates()
+    for (const [id, update] of Object.entries(updates)) versionUpdates.set(id, update)
+    renderVersionUpdateState()
+    const updatable = [...versionUpdates.values()].filter(update => update.available).length
+    if (updatable > 0) notify(t('modUpdatesFound', { count: updatable }))
+  } catch (error) {
+    console.warn('Could not check the mod versions for updates:', error)
   }
 }
 
@@ -983,7 +942,7 @@ function renderSelectedVersion() {
   if (!selectedVersion) return
   const state = versionStates.get(selectedVersion.id) || { installed: false }
   const action = document.getElementById('mod-action')
-  const hasCommit = /^[a-f0-9]{40}$/i.test(selectedVersion.commit || '')
+  const hasCommit = /^[a-f0-9]{40}$/i.test(getCurrentCommit(selectedVersion))
   const actionName = state.installed
     ? state.stats?.running ? 'stop' : 'play'
     : 'download'
@@ -1003,38 +962,7 @@ function renderSelectedVersion() {
   document.getElementById('games-directory').textContent = state.installDirectory || versionsDirectory || 'Games'
   document.getElementById('settings-games-directory').textContent = versionsDirectory || 'Games'
   document.getElementById('reset-game-folder').hidden = !state.external
-}
-
-async function refreshVersionUpdateBadge() {
-  if (!selectedVersion) return
-  const actionArea = document.getElementById('version-update-actions')
-  if (!actionArea) return
-  try {
-    const updates = await window.aocLauncher.getVersionUpdates?.() || []
-    const update = Array.isArray(updates) ? updates.find(item => item.id === selectedVersion.id) : null
-    actionArea.replaceChildren()
-    if (update?.available) {
-      const badge = document.createElement('span')
-      badge.className = 'version-update-badge'
-      badge.textContent = 'Доступно обновление'
-      const button = document.createElement('button')
-      button.type = 'button'
-      button.className = 'soft-button version-update-button'
-      button.textContent = 'Обновить'
-      button.addEventListener('click', async () => {
-        try {
-          await window.aocLauncher.downloadMod(selectedVersion.id)
-          await refreshStatus()
-          notify('Обновление скачано и установлено')
-        } catch (error) {
-          notify(error.message || 'Не удалось обновить версию', true)
-        }
-      })
-      actionArea.append(badge, button)
-    }
-  } catch (error) {
-    actionArea.replaceChildren()
-  }
+  renderVersionUpdateState()
 }
 
 function setBusy(value) {
@@ -1050,8 +978,6 @@ function renderInstallState(status) {
   if (config) renderConfig(config)
   renderVersionDetails(selectedVersion)
   renderSelectedVersion()
-  refreshVersionUpdateBadge().catch(() => {})
-  loadVersionHistory().catch(() => {})
 }
 
 function formatBytes(bytes) {
@@ -1265,7 +1191,7 @@ async function installOrLaunch() {
     return
   }
 
-  if (!/^[a-f0-9]{40}$/i.test(version.commit || '')) {
+  if (!/^[a-f0-9]{40}$/i.test(getCurrentCommit(version))) {
     notify(t('versionCommitMissing'), true)
     return
   }
@@ -1275,6 +1201,24 @@ async function installOrLaunch() {
     acceptLabel: t('download')
   })
   if (!confirmed) return
+  await downloadVersion(version)
+}
+
+function getCurrentCommit(version) {
+  return versionStates.get(version.id)?.commit || version.commit || ''
+}
+
+async function downloadVersion(version, options = {}) {
+  const { commit = '', backup = false, confirmMessage = '', acceptLabel = t('download') } = options
+  if (busy) return
+  if (confirmMessage) {
+    const confirmed = await confirmAction({
+      title: t('confirmDownloadTitle'),
+      message: confirmMessage,
+      acceptLabel
+    })
+    if (!confirmed) return
+  }
   busy = true
   document.getElementById('download-progress').hidden = false
   document.getElementById('progress-message').textContent = t('downloadStarted')
@@ -1286,8 +1230,11 @@ async function installOrLaunch() {
   renderSelectedVersion()
   resetProgress()
   try {
-    await window.aocLauncher.downloadMod(version.id)
+    const result = backup
+      ? await window.aocLauncher.installModCommit({ versionId: version.id, commit })
+      : await window.aocLauncher.downloadMod({ versionId: version.id, commit })
     renderInstallState(await window.aocLauncher.getModStatus())
+    if (result?.backupDirectory) notify(t('rollbackBackupCreated', { path: result.backupDirectory }))
     notify(t('installedVersionMessage', { name: version.name }))
   } catch (error) {
     document.getElementById('download-progress').hidden = true
@@ -1329,10 +1276,106 @@ function openFolder(versionId) {
   })
 }
 
+async function renderCommitList() {
+  const container = document.getElementById('mod-commit-list')
+  if (!container) return
+  const installed = config.versions.filter(version => versionStates.get(version.id)?.installed)
+  container.replaceChildren()
+  if (!installed.length) {
+    const empty = document.createElement('p')
+    empty.className = 'commit-list-hint'
+    empty.textContent = t('commitsNoInstalledVersions')
+    container.append(empty)
+    return
+  }
+  for (const version of installed) {
+    const group = document.createElement('div')
+    group.className = 'commit-group'
+    const title = document.createElement('h3')
+    title.className = 'commit-group-title'
+    title.textContent = version.name
+    const list = document.createElement('div')
+    list.className = 'commit-group-list'
+    const loading = document.createElement('p')
+    loading.className = 'commit-list-hint'
+    loading.textContent = t('commitsLoading')
+    list.append(loading)
+    group.append(title, list)
+    container.append(group)
+    try {
+      const commits = await window.aocLauncher.openModCommits(version.id)
+      list.replaceChildren()
+      if (!commits.length) {
+        const empty = document.createElement('p')
+        empty.className = 'commit-list-hint'
+        empty.textContent = t('commitsUnavailable')
+        list.append(empty)
+        continue
+      }
+      const current = getCurrentCommit(version)
+      for (const commit of commits) {
+        const row = document.createElement('div')
+        row.className = 'commit-row'
+        if (commit.sha === current) row.classList.add('commit-current')
+        const copy = document.createElement('span')
+        copy.className = 'commit-copy'
+        const message = document.createElement('b')
+        message.textContent = commit.message || commit.short
+        const meta = document.createElement('small')
+        meta.textContent = `${commit.short} · ${formatLastPlayed(commit.date)}`
+        copy.append(message, meta)
+        const action = document.createElement('button')
+        action.type = 'button'
+        action.className = 'soft-button'
+        action.dataset.commit = commit.sha
+        action.dataset.version = version.id
+        action.textContent = commit.sha === current ? t('installed') : t('rollback')
+        action.disabled = commit.sha === current || busy
+        row.append(copy, action)
+        list.append(row)
+      }
+    } catch (error) {
+      list.replaceChildren()
+      const failed = document.createElement('p')
+      failed.className = 'commit-list-hint'
+      failed.textContent = error.message || t('commitsUnavailable')
+      list.append(failed)
+    }
+  }
+}
+
 document.querySelectorAll('.mod-action').forEach((button) => {
   button.addEventListener('click', installOrLaunch)
 })
 document.getElementById('delete-mod').addEventListener('click', deleteVersion)
+document.getElementById('update-mod').addEventListener('click', async () => {
+  if (busy || !selectedVersion) return
+  const version = selectedVersion
+  const update = versionUpdates.get(version.id)
+  if (!update?.available) return
+  await downloadVersion(version, {
+    commit: update.latest,
+    confirmMessage: t('updateConfirmVersion', { name: version.name, message: update.message || update.latest.slice(0, 7) }),
+    acceptLabel: t('updateMod')
+  })
+  await checkModUpdates()
+  renderCommitList()
+})
+document.getElementById('mod-commit-list').addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-commit]')
+  if (!button || busy) return
+  const version = config.versions.find(entry => entry.id === button.dataset.version)
+  if (!version) return
+  const commit = button.dataset.commit
+  await downloadVersion(version, {
+    commit,
+    backup: true,
+    confirmMessage: t('rollbackConfirmVersion', { name: version.name, short: commit.slice(0, 7) }),
+    acceptLabel: t('rollback')
+  })
+  await checkModUpdates()
+  renderCommitList()
+})
 for (const id of ['open-mod-folder', 'open-mod-folder-secondary', 'open-mod-folder-settings']) {
   document.getElementById(id).addEventListener('click', () => openFolder())
 }
@@ -1409,6 +1452,29 @@ document.getElementById('create-crash-report').addEventListener('click', async (
   }
 })
 
+document.getElementById('send-crash-report').addEventListener('click', async () => {
+  if (!crashVersionId) return
+  const hint = document.getElementById('crash-report-hint')
+  try {
+    const result = await window.aocLauncher.sendCrashReport({
+      versionId: crashVersionId,
+      subject: document.getElementById('crash-subject').value,
+      details: document.getElementById('crash-details').value
+    })
+    document.getElementById('crash-report-log').textContent = result.logPath
+    hint.hidden = false
+  } catch (error) {
+    notify(error.message || t('launchError'), true)
+  }
+})
+document.getElementById('open-crash-log-folder').addEventListener('click', async () => {
+  try {
+    await window.aocLauncher.openLogsFolder()
+  } catch (error) {
+    notify(error.message || t('launchError'), true)
+  }
+})
+
 window.aocLauncher.onDownloadProgress(handleProgress)
 window.aocLauncher.onGameDiscovery(({ error } = {}) => {
   if (error) notify(t('gameSearchFailed', { error }), true)
@@ -1458,16 +1524,28 @@ window.aocLauncher.onUpdateStatus(status => {
 
 async function runStartupSequence() {
   const startupMessage = document.getElementById('startup-message')
-  await new Promise(resolve => setTimeout(resolve, 450))
-  startupMessage.textContent = t('updateChecking')
+  const startedAt = Date.now()
+  const minimumDuration = 2000
+  const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
+  startupMessage.textContent = t('startupInitializing')
+  await wait(340)
+  startupMessage.textContent = t('startupLoadingVersions')
+  const versionsReady = window.aocLauncher.getModStatus().catch(error => {
+    console.warn('Could not read the mod list during startup:', error)
+  })
+  const modUpdates = checkModUpdates()
+  await wait(300)
+  startupMessage.textContent = t('startupCheckingUpdates')
   const updateCheck = window.aocLauncher.checkForUpdates().catch(error => {
     console.warn('Launcher update check failed:', error)
   })
   await Promise.race([
-    updateCheck,
-    new Promise(resolve => setTimeout(resolve, 8000))
+    Promise.all([versionsReady, updateCheck, modUpdates]),
+    wait(8000)
   ])
-  await refreshVersionUpdateBadge().catch(() => {})
+  startupMessage.textContent = t('startupReady')
+  const remaining = minimumDuration - (Date.now() - startedAt)
+  if (remaining > 0) await wait(remaining)
   const startupScreen = document.getElementById('startup-screen')
   startupScreen.classList.add('startup-screen-leaving')
   setTimeout(() => startupScreen.remove(), 650)
@@ -1477,3 +1555,4 @@ renderProfile()
 refreshStatus()
 setInterval(refreshStats, 1000)
 runStartupSequence()
+setInterval(checkModUpdates, 30 * 60 * 1000)

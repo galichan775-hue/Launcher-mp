@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron')
+const { app, BrowserWindow, clipboard, dialog, ipcMain, shell } = require('electron')
 const fs = require('node:fs')
 const fsp = require('node:fs/promises')
 const { spawn, spawnSync } = require('node:child_process')
@@ -9,12 +9,17 @@ const yauzl = require('yauzl')
 const { autoUpdater } = require('electron-updater')
 const launcherConfig = require('../app/launcher-config.json')
 const JAVA_DOWNLOAD_URL = 'https://adoptium.net/temurin/releases/?version=17'
+const TELEGRAM_SUPPORT_URL = 'https://t.me/communityAOC2mp/2682'
+// Set TELEGRAM_BOT_TOKEN to send reports automatically instead of copying them to the clipboard.
+const TELEGRAM_BOT_TOKEN = ''
 const gameStatsPath = path.join(app.getPath('userData'), 'game-stats.json')
 const gameLocationsPath = path.join(app.getPath('userData'), 'game-locations.json')
+const versionCommitsPath = path.join(app.getPath('userData'), 'version-commits.json')
 const activeGames = new Map()
 const launchingVersions = new Set()
 let gameStats = { versions: {} }
 let gameLocations = {}
+let versionCommitOverrides = {}
 let statsWrite = Promise.resolve()
 const gameDiscoveryPromises = new Map()
 const gameDiscoveryCompleted = new Set()
@@ -137,6 +142,77 @@ autoUpdater.on('error', error => {
   console.error('Launcher update failed:', error)
   reportLauncherUpdate({ phase: 'error', message: error.message })
 })
+
+// --- GitHub API helpers (mod update checks, commit history) ---
+const repositoryHeads = new Map()
+const repositoryCommits = new Map()
+
+async function fetchGitHubJson(url, etag) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 20_000)
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'AOC-2-Multiplayer',
+        Accept: 'application/vnd.github+json',
+        ...(etag ? { 'If-None-Match': etag } : {})
+      },
+      signal: controller.signal
+    })
+    if (response.status === 304) return { notModified: true }
+    if (response.status === 403) throw new Error('GitHub API вернул ошибку (HTTP 403): исчерпан лимит запросов без токена.')
+    if (!response.ok) throw new Error(`GitHub API вернул ошибку (HTTP ${response.status}).`)
+    return { etag: response.headers.get('etag'), data: await response.json() }
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error('GitHub API не ответил за 20 секунд.')
+    throw error
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+async function getRepositoryHead(repository) {
+  const cached = repositoryHeads.get(repository)
+  try {
+    const response = await fetchGitHubJson(`https://api.github.com/repos/${repository}/commits/HEAD`, cached?.etag)
+    if (response.notModified && cached) return cached
+    const entry = {
+      sha: response.data.sha,
+      date: response.data.commit?.committer?.date || null,
+      message: String(response.data.commit?.message || '').split('\n')[0].slice(0, 120)
+    }
+    repositoryHeads.set(repository, { ...entry, etag: response.etag })
+    return entry
+  } catch (error) {
+    if (cached) return { ...cached, error: error.message }
+    return { sha: '', date: null, message: '', error: error.message }
+  }
+}
+
+function getVersionCommit(version) {
+  const override = versionCommitOverrides[version.id]
+  return typeof override === 'string' && /^[a-f0-9]{40}$/i.test(override) ? override : version.commit
+}
+
+function readVersionCommits() {
+  try {
+    const saved = JSON.parse(fs.readFileSync(versionCommitsPath, 'utf8'))
+    if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
+      for (const version of launcherConfig.versions) {
+        if (typeof saved[version.id] === 'string') versionCommitOverrides[version.id] = saved[version.id]
+      }
+    }
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw new Error(`Не удалось прочитать сохранённые коммиты версий: ${error.message}`, { cause: error })
+  }
+}
+
+async function persistVersionCommits() {
+  await fsp.mkdir(path.dirname(versionCommitsPath), { recursive: true })
+  const temporaryPath = `${versionCommitsPath}.tmp`
+  await fsp.writeFile(temporaryPath, JSON.stringify(versionCommitOverrides, null, 2))
+  await fsp.rename(temporaryPath, versionCommitsPath)
+}
 
 function readGameLocations() {
   try {
@@ -674,139 +750,206 @@ function extractModArchive(archivePath, destination, onProgress) {
   })
 }
 
-const versionUpdateCachePath = path.join(app.getPath('userData'), 'version-update-cache.json')
-
-function readVersionUpdateCache() {
-  try {
-    const raw = fs.readFileSync(versionUpdateCachePath, 'utf8')
-    const parsed = JSON.parse(raw)
-    return parsed && typeof parsed === 'object' ? parsed : {}
-  } catch (error) {
-    if (error.code !== 'ENOENT') console.warn('Could not read GitHub update cache:', error)
-    return {}
-  }
-}
-
-function writeVersionUpdateCache(cache) {
-  try {
-    fs.mkdirSync(path.dirname(versionUpdateCachePath), { recursive: true })
-    fs.writeFileSync(versionUpdateCachePath, JSON.stringify(cache, null, 2))
-  } catch (error) {
-    console.warn('Could not save GitHub update cache:', error)
-  }
-}
-
-async function fetchGithubJson(url, headers = {}) {
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/vnd.github+json',
-      'User-Agent': 'AOC-2-Multiplayer',
-      ...headers
-    },
-    redirect: 'follow'
-  })
-  if (response.status === 304) {
-    return { status: 304, data: null }
-  }
-  if (!response.ok) {
-    throw new Error(`GitHub API ${response.status} for ${url}`)
-  }
-  return { status: response.status, data: await response.json(), etag: response.headers.get('etag') || null }
-}
-
-async function getGithubRepositoryLatestCommit(repository, branch = 'main') {
-  const cache = readVersionUpdateCache()
-  const repoCache = cache[repository] && cache[repository][branch] ? cache[repository][branch] : {}
-  const url = `https://api.github.com/repos/${repository}/commits/${branch}`
-  let response
-  try {
-    response = await fetchGithubJson(url, repoCache.etag ? { 'If-None-Match': repoCache.etag } : {})
-  } catch (error) {
-    console.warn(`GitHub repo check failed for ${repository} (${branch}):`, error.message)
-    return null
-  }
-  if (response.status === 304 && repoCache.sha) {
-    return { repository, branch, sha: repoCache.sha, etag: repoCache.etag, available: false }
-  }
-  if (!response.data || !response.data.sha) return null
-  const nextCache = { ...(cache[repository] || {}) }
-  nextCache[branch] = {
-    sha: response.data.sha,
-    etag: response.etag || repoCache.etag || null,
-    checkedAt: Date.now()
-  }
-  cache[repository] = nextCache
-  writeVersionUpdateCache(cache)
-  return { repository, branch, sha: response.data.sha, etag: response.etag || repoCache.etag || null, available: true }
-}
-
-async function getGithubRepositoryHistory(repository, perPage = 5) {
-  const url = `https://api.github.com/repos/${repository}/commits?per_page=${perPage}`
-  const response = await fetchGithubJson(url)
-  if (!response.data || !Array.isArray(response.data)) return []
-  return response.data.map(item => ({
-    sha: item.sha,
-    date: item.commit?.author?.date || null,
-    message: item.commit?.message ? item.commit.message.split('\n')[0].trim() : 'Update'
-  }))
-}
-
 ipcMain.handle('launcher:get-config', () => launcherConfig)
 ipcMain.handle('launcher:get-java', () => getJavaExecutable())
-ipcMain.handle('launcher:get-version-updates', async () => {
-  const versions = await Promise.all(launcherConfig.versions.map(async (version) => {
-    if (!version.repository) return { id: version.id, available: false, current: version.commit || null, latest: null }
-    const latest = await getGithubRepositoryLatestCommit(version.repository)
-    const current = typeof version.commit === 'string' ? version.commit.trim() : ''
-    return {
-      id: version.id,
-      repository: version.repository,
-      current,
-      latest: latest?.sha || null,
-      available: Boolean(latest && current && latest.sha && latest.sha !== current),
-      branch: latest?.branch || 'main'
-    }
-  }))
-  return versions
-})
-ipcMain.handle('launcher:get-version-history', async (_event, versionId) => {
+ipcMain.handle('launcher:open-launch-log', async (_event, versionId) => {
   const version = getVersion(versionId)
-  const history = await getGithubRepositoryHistory(version.repository, 5)
-  return history
+  const logPath = path.join(app.getPath('userData'), 'logs', `${version.id}-latest.log`)
+  if (!fs.existsSync(logPath)) throw new Error('Журнал пока не создан. Нажми «Играть», чтобы записать попытку запуска.')
+  const result = await shell.openPath(logPath)
+  if (result) throw new Error(`Не удалось открыть журнал запуска: ${result}`)
 })
-ipcMain.handle('mod:rollback-version', async (event, versionId, commit) => {
+ipcMain.handle('launcher:create-crash-report', async (_event, { versionId, subject, details }) => {
   const version = getVersion(versionId)
-  const commitId = typeof commit === 'string' ? commit.trim() : ''
-  if (!/^[a-f0-9]{40}$/i.test(commitId)) {
-    throw new Error('Не указан корректный SHA коммита для отката.')
+  if (typeof subject !== 'string' || typeof details !== 'string') {
+    throw new Error('Заполни тему и описание ошибки.')
   }
-  const destination = getVersionDirectory(version.id)
-  const backupDirectory = `${destination}-${Date.now()}.bak`
-  if (fs.existsSync(destination)) {
-    await fsp.rename(destination, backupDirectory)
-  }
+  const logPath = path.join(app.getPath('userData'), 'logs', `${version.id}-latest.log`)
+  let logText
   try {
-    await installVersionArchive(version.id, commitId, event.sender)
-    return { ok: true, versionId, backup: backupDirectory, commit: commitId }
+    logText = await fsp.readFile(logPath, 'utf8')
   } catch (error) {
-    if (fs.existsSync(backupDirectory) && !fs.existsSync(destination)) {
-      try {
-        await fsp.rename(backupDirectory, destination)
-      } catch (restoreError) {
-        console.warn('Rollback restore failed:', restoreError)
+    if (error.code === 'ENOENT') throw new Error('Журнал запуска не найден. Попробуй снова запустить игру.')
+    throw error
+  }
+  const report = [
+    'AOC 2 Multiplayer — crash report',
+    `Date: ${new Date().toISOString()}`,
+    `Launcher: ${app.getVersion()}`,
+    `Game version: ${version.name}`,
+    '',
+    'Subject:',
+    subject.trim().slice(0, 100),
+    '',
+    'Description:',
+    details.trim().slice(0, 3000) || '(not provided)',
+    '',
+    'Launch log:',
+    logText
+  ].join('\r\n')
+  const owner = BrowserWindow.getFocusedWindow()
+  const options = {
+    title: 'Сохранить отчет об ошибке',
+    defaultPath: path.join(app.getPath('documents'), `AOC2-crash-report-${version.version}.txt`),
+    filters: [{ name: 'Отчет об ошибке', extensions: ['txt'] }]
+  }
+  const result = owner
+    ? await dialog.showSaveDialog(owner, options)
+    : await dialog.showSaveDialog(options)
+  if (result.canceled || !result.filePath) return { canceled: true }
+  await fsp.writeFile(result.filePath, report, 'utf8')
+  const support = launcherConfig.community.find(link => /discord/i.test(link.label))?.url
+  if (support) await shell.openExternal(support)
+  return { canceled: false, filePath: result.filePath }
+})
+ipcMain.handle('launcher:send-crash-report', async (_event, { versionId, subject, details }) => {
+  const version = getVersion(versionId)
+  const logPath = path.join(app.getPath('userData'), 'logs', `${version.id}-latest.log`)
+  let logText = ''
+  try {
+    logText = await fsp.readFile(logPath, 'utf8')
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error
+  }
+  const report = [
+    'AOC 2 Multiplayer — ошибка запуска',
+    `Launcher: ${app.getVersion()}`,
+    `Version: ${version.name}`,
+    `Date: ${new Date().toISOString()}`,
+    '',
+    `Тема: ${(subject || '').trim().slice(0, 100) || '—'}`,
+    '',
+    'Описание:',
+    (details || '').trim().slice(0, 3000) || '(не указано)',
+    '',
+    `Журнал запуска: ${logPath}`,
+    logText ? `\n${logText.split(/\r?\n/).slice(-60).join('\n')}` : '(журнал пока не создан)'
+  ].join('\n')
+
+  if (TELEGRAM_BOT_TOKEN) {
+    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: '@communityAOC2mp', text: report })
+    })
+    if (!response.ok) throw new Error(`Telegram API вернул ошибку (HTTP ${response.status}).`)
+    return { copied: false, sent: true, logPath, logExists: Boolean(logText) }
+  }
+
+  clipboard.writeText(report)
+  await shell.openExternal(TELEGRAM_SUPPORT_URL)
+  return { copied: true, sent: false, logPath, logExists: Boolean(logText) }
+})
+ipcMain.handle('launcher:open-logs-folder', async () => {
+  const logsDirectory = path.join(app.getPath('userData'), 'logs')
+  await fsp.mkdir(logsDirectory, { recursive: true })
+  const result = await shell.openPath(logsDirectory)
+  if (result) throw new Error(`Не удалось открыть папку с журналами: ${result}`)
+  return { opened: true, path: logsDirectory }
+})
+ipcMain.handle('launcher:open-last-crash', async () => {
+  try {
+    const logsDir = path.join(app.getPath('userData'), 'logs')
+    if (!fs.existsSync(logsDir)) throw new Error('Каталог логов не найден.')
+    const entries = await fsp.readdir(logsDir, { withFileTypes: true })
+    const files = entries
+      .filter(e => e.isFile() && e.name.endsWith('-latest.log'))
+      .map(e => ({ name: e.name, path: path.join(logsDir, e.name), mtime: fs.statSync(path.join(logsDir, e.name)).mtimeMs }))
+      .sort((a, b) => b.mtime - a.mtime)
+    for (const file of files) {
+      let content = ''
+      try { content = await fsp.readFile(file.path, 'utf8') } catch (e) { continue }
+      if (/Process error|Process exit: code=(?!0)/.test(content)) {
+        const result = await shell.openPath(file.path)
+        if (result) throw new Error(`Не удалось открыть лог: ${result}`)
+        return { opened: true, path: file.path }
       }
     }
+    throw new Error('Крашей не найдено в логах.')
+  } catch (error) {
     throw error
   }
 })
 
-async function installVersionArchive(versionId, commitId, webContents) {
+ipcMain.handle('launcher:download-java', async () => {
+  await shell.openExternal(JAVA_DOWNLOAD_URL)
+  return { opened: true }
+})
+ipcMain.handle('launcher:check-updates', async () => {
+  if (!app.isPackaged) return { supported: false, version: app.getVersion() }
+  try {
+    await autoUpdater.checkForUpdates()
+    return { supported: true, version: app.getVersion() }
+  } catch (error) {
+    console.error('Could not check for launcher updates:', error)
+    reportLauncherUpdate({ phase: 'error', message: error.message })
+    return { supported: true, version: app.getVersion(), error: error.message }
+  }
+})
+ipcMain.handle('launcher:install-update', () => {
+  autoUpdater.quitAndInstall()
+})
+ipcMain.handle('window:minimize', event => {
+  BrowserWindow.fromWebContents(event.sender)?.minimize()
+})
+ipcMain.handle('window:close', event => {
+  BrowserWindow.fromWebContents(event.sender)?.close()
+})
+
+ipcMain.handle('mod:get-status', async () => {
+  await ensureVersionsDirectory()
+  const versions = []
+  for (const version of launcherConfig.versions) {
+    if (!isInstalled(version.id) && !gameDiscoveryCompleted.has(version.id) &&
+      !gameDiscoveryPromises.has(version.id)) {
+      discoverExistingGameDirectory(version.id).then(directory => {
+        reportGameDiscovery({ versionId: version.id, found: Boolean(directory) })
+      }).catch(error => {
+        console.error(`Could not search for the game folder for ${version.id}:`, error)
+        reportGameDiscovery({ versionId: version.id, found: false, error: error.message })
+      })
+    }
+    const installDirectory = getVersionDirectory(version.id)
+    const installed = isInstalled(version.id)
+    const stats = getVersionStats(version.id)
+    if (installed && !stats.installedAt) {
+      try {
+        stats.installedAt = fs.statSync(path.join(installDirectory, 'AoH2MP.jar')).birthtime.toISOString()
+      } catch (error) {
+        if (error.code !== 'ENOENT') throw error
+      }
+    }
+    versions.push({
+      id: version.id,
+      installed,
+      installDirectory,
+      commit: getVersionCommit(version) || '',
+      external: Boolean(gameLocations[version.id]),
+      searching: gameDiscoveryPromises.has(version.id),
+      stats
+    })
+  }
+  return {
+    versionsDirectory: getVersionsDirectory(),
+    versions,
+    java: getJavaExecutable()
+  }
+})
+
+ipcMain.handle('game:get-stats', (_event, versionId) => ({
+  ...getVersionStats(getVersion(versionId).id)
+}))
+
+async function installVersionFromCommit(event, versionId, requestedCommit, keepBackup) {
   const version = getVersion(versionId)
-  const commit = typeof commitId === 'string' && commitId.trim() ? commitId.trim() : (version.commit || '').trim()
-  if (!/^[a-f0-9]{40}$/i.test(commit)) {
+  const commit = requestedCommit || getVersionCommit(version)
+  if (!/^[a-f0-9]{40}$/i.test(commit || '')) {
     throw new Error(`Для версии ${version.name} ещё не указан опубликованный коммит. Скачивание пока недоступно.`)
   }
+  if (isInstalled(version.id) && !requestedCommit) {
+    return { installed: true, installDirectory: getVersionDirectory(version.id) }
+  }
+
   const versionsDirectory = await ensureVersionsDirectory()
   const workDirectory = await fsp.mkdtemp(path.join(os.tmpdir(), 'aoc2-mod-'))
   const archivePath = path.join(workDirectory, 'source.zip')
@@ -883,10 +1026,12 @@ async function installVersionArchive(versionId, commitId, webContents) {
         if (now - lastProgressAt >= 500 || downloaded === contentLength) {
           const elapsedSeconds = Math.max((now - lastProgressAt) / 1000, 0.001)
           const currentSpeed = (downloaded - lastProgressBytes) / elapsedSeconds
-          speedBytesPerSecond = speedBytesPerSecond ? speedBytesPerSecond * 0.72 + currentSpeed * 0.28 : currentSpeed
+          speedBytesPerSecond = speedBytesPerSecond
+            ? speedBytesPerSecond * 0.72 + currentSpeed * 0.28
+            : currentSpeed
           lastProgressAt = now
           lastProgressBytes = downloaded
-          reportDownload(webContents, {
+          reportDownload(event.sender, {
             phase: 'download',
             received: downloaded,
             total: contentLength,
@@ -907,15 +1052,19 @@ async function installVersionArchive(versionId, commitId, webContents) {
     }
 
     if (downloaded === 0) throw new Error('Сервер загрузки прислал пустой архив.')
-    reportDownload(webContents, { phase: 'download', received: downloaded, total: downloaded, speedBytesPerSecond })
-    reportDownload(webContents, { phase: 'extract', percent: 0, expandedSize: 0 })
-
+    reportDownload(event.sender, {
+      phase: 'download',
+      received: downloaded,
+      total: downloaded,
+      speedBytesPerSecond
+    })
+    reportDownload(event.sender, { phase: 'extract', percent: 0, expandedSize: 0 })
     let lastExtractProgressAt = 0
     await extractModArchive(archivePath, extractDirectory, progress => {
       const now = Date.now()
       if (progress.percent === 100 || now - lastExtractProgressAt >= 100) {
         lastExtractProgressAt = now
-        reportDownload(webContents, { phase: 'extract', ...progress })
+        reportDownload(event.sender, { phase: 'extract', ...progress })
       }
     })
 
@@ -936,199 +1085,91 @@ async function installVersionArchive(versionId, commitId, webContents) {
     await fsp.rm(previousDirectory, { recursive: true, force: true })
     await fsp.cp(repositoryRoot, stagingDirectory, { recursive: true })
 
-    if (isInstalled(version.id)) await fsp.rename(destination, previousDirectory)
+    const backupDirectory = keepBackup
+      ? path.join(versionsDirectory, `${version.id}.bak-${Date.now()}`)
+      : previousDirectory
+    let backupMoved = false
+    if (isInstalled(version.id)) {
+      await fsp.rename(destination, backupDirectory)
+      backupMoved = true
+    }
     try {
       await fsp.rename(stagingDirectory, destination)
     } catch (error) {
-      if (fs.existsSync(previousDirectory)) await fsp.rename(previousDirectory, destination)
+      if (backupMoved) await fsp.rename(backupDirectory, destination)
       throw error
     }
-    await fsp.rm(previousDirectory, { recursive: true, force: true })
-
-    version.commit = commit
-    try {
-      const configPath = path.join(__dirname, '..', 'app', 'launcher-config.json')
-      const raw = fs.readFileSync(configPath, 'utf8')
-      const config = JSON.parse(raw)
-      const entry = config.versions?.find(item => item.id === version.id)
-      if (entry) {
-        entry.commit = commit
-        fs.writeFileSync(configPath, JSON.stringify(config, null, 2))
-      }
-    } catch (error) {
-      console.warn('Could not persist commit update in launcher-config.json:', error)
-    }
+    if (!keepBackup) await fsp.rm(previousDirectory, { recursive: true, force: true })
 
     const versionStats = gameStats.versions[version.id] || {}
     versionStats.installedAt = new Date().toISOString()
     gameStats.versions[version.id] = versionStats
+    versionCommitOverrides[version.id] = commit
     await persistGameStats()
-    reportDownload(webContents, { phase: 'complete', received: downloaded, total: downloaded })
-    return { installed: true, installDirectory: destination, stats: getVersionStats(version.id) }
+    await persistVersionCommits()
+    reportDownload(event.sender, { phase: 'complete', received: downloaded, total: downloaded })
+    return {
+      installed: true,
+      installDirectory: destination,
+      commit,
+      backupDirectory: keepBackup && backupMoved ? backupDirectory : null,
+      stats: getVersionStats(version.id)
+    }
+  } catch (error) {
+    reportDownload(event.sender, { phase: 'error', message: error.message })
+    throw error
   } finally {
     if (stagingDirectory) await fsp.rm(stagingDirectory, { recursive: true, force: true })
     await fsp.rm(workDirectory, { recursive: true, force: true })
   }
 }
 
-function getLatestLaunchLogPath(versionId) {
-  const version = getVersion(versionId)
-  return path.join(app.getPath('userData'), 'logs', `${version.id}-latest.log`)
-}
+ipcMain.handle('mod:download', async (event, payload) => {
+  const versionId = typeof payload === 'string' ? payload : payload?.versionId
+  const commit = typeof payload === 'string' ? undefined : payload?.commit
+  return installVersionFromCommit(event, versionId, commit, false)
+})
 
-function getLatestCrashLogPath() {
-  const logDirectory = path.join(app.getPath('userData'), 'logs')
-  const candidates = []
-  try {
-    for (const entry of fs.readdirSync(logDirectory, { withFileTypes: true })) {
-      if (entry.isFile() && /-crash\.(?:log|txt)$/i.test(entry.name)) candidates.push(path.join(logDirectory, entry.name))
+ipcMain.handle('mod:install-commit', async (event, { versionId, commit }) => {
+  if (!/^[a-f0-9]{40}$/i.test(commit || '')) throw new Error('Некорректный идентификатор коммита.')
+  return installVersionFromCommit(event, versionId, commit, true)
+})
+
+ipcMain.handle('mod:check-updates', async () => {
+  const result = {}
+  for (const version of launcherConfig.versions) {
+    const head = await getRepositoryHead(version.repository)
+    const current = getVersionCommit(version) || ''
+    result[version.id] = {
+      current,
+      latest: head.sha || '',
+      date: head.date || null,
+      message: head.message || '',
+      available: Boolean(head.sha) && /^[a-f0-9]{40}$/i.test(current) && head.sha !== current,
+      error: head.error || null
     }
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw error
   }
-  if (!candidates.length) return null
-  candidates.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)
-  return candidates[0]
-}
+  return result
+})
 
-ipcMain.handle('launcher:open-launch-log', async (_event, versionId) => {
-  const logPath = getLatestLaunchLogPath(versionId)
-  if (!fs.existsSync(logPath)) throw new Error('Журнал пока не создан. Нажми «Играть», чтобы записать попытку запуска.')
-  const result = await shell.openPath(logPath)
-  if (result) throw new Error(`Не удалось открыть журнал запуска: ${result}`)
-})
-ipcMain.handle('launcher:get-last-crash-log', async () => getLatestCrashLogPath())
-ipcMain.handle('launcher:open-crash-log', async (_event, logPath) => {
-  if (!logPath || !fs.existsSync(logPath)) throw new Error('Лог последнего краша не найден.')
-  const result = await shell.openPath(logPath)
-  if (result) throw new Error(`Не удалось открыть лог последнего краша: ${result}`)
-})
-ipcMain.handle('launcher:create-crash-report', async (_event, { versionId, subject, details }) => {
+ipcMain.handle('mod:commits', async (_event, versionId) => {
   const version = getVersion(versionId)
-  if (typeof subject !== 'string' || typeof details !== 'string') {
-    throw new Error('Заполни тему и описание ошибки.')
-  }
-  const logPath = path.join(app.getPath('userData'), 'logs', `${version.id}-latest.log`)
-  let logText
+  const cached = repositoryCommits.get(version.repository)
   try {
-    logText = await fsp.readFile(logPath, 'utf8')
+    const response = await fetchGitHubJson(`https://api.github.com/repos/${version.repository}/commits?per_page=12`, cached?.etag)
+    if (response.notModified && cached) return cached.commits
+    const commits = response.data.map(entry => ({
+      sha: entry.sha,
+      short: entry.sha.slice(0, 7),
+      date: entry.commit?.committer?.date || null,
+      message: String(entry.commit?.message || '').split('\n')[0].slice(0, 120)
+    }))
+    repositoryCommits.set(version.repository, { etag: response.etag, commits })
+    return commits
   } catch (error) {
-    if (error.code === 'ENOENT') throw new Error('Журнал запуска не найден. Попробуй снова запустить игру.')
+    if (cached) return cached.commits
     throw error
   }
-  const report = [
-    'AOC 2 Multiplayer — crash report',
-    `Date: ${new Date().toISOString()}`,
-    `Launcher: ${app.getVersion()}`,
-    `Game version: ${version.name}`,
-    '',
-    'Subject:',
-    subject.trim().slice(0, 100),
-    '',
-    'Description:',
-    details.trim().slice(0, 3000) || '(not provided)',
-    '',
-    'Launch log:',
-    logText
-  ].join('\r\n')
-  const owner = BrowserWindow.getFocusedWindow()
-  const options = {
-    title: 'Сохранить отчет об ошибке',
-    defaultPath: path.join(app.getPath('documents'), `AOC2-crash-report-${version.version}.txt`),
-    filters: [{ name: 'Отчет об ошибке', extensions: ['txt'] }]
-  }
-  const result = owner
-    ? await dialog.showSaveDialog(owner, options)
-    : await dialog.showSaveDialog(options)
-  if (result.canceled || !result.filePath) return { canceled: true }
-  await fsp.writeFile(result.filePath, report, 'utf8')
-  const support = launcherConfig.community.find(link => /discord/i.test(link.label))?.url
-  if (support) await shell.openExternal(support)
-  return { canceled: false, filePath: result.filePath }
-})
-ipcMain.handle('launcher:download-java', async () => {
-  await shell.openExternal(JAVA_DOWNLOAD_URL)
-  return { opened: true }
-})
-ipcMain.handle('launcher:check-updates', async () => {
-  if (!app.isPackaged) return { supported: false, version: app.getVersion() }
-  try {
-    await autoUpdater.checkForUpdates()
-    return { supported: true, version: app.getVersion() }
-  } catch (error) {
-    console.error('Could not check for launcher updates:', error)
-    reportLauncherUpdate({ phase: 'error', message: error.message })
-    return { supported: true, version: app.getVersion(), error: error.message }
-  }
-})
-ipcMain.handle('launcher:open-external', async (_event, url) => {
-  if (typeof url !== 'string' || !url) throw new Error('Не указан URL для открытия.')
-  await shell.openExternal(url)
-  return { ok: true }
-})
-ipcMain.handle('launcher:install-update', () => {
-  autoUpdater.quitAndInstall()
-})
-ipcMain.handle('window:minimize', event => {
-  BrowserWindow.fromWebContents(event.sender)?.minimize()
-})
-ipcMain.handle('window:close', event => {
-  BrowserWindow.fromWebContents(event.sender)?.close()
-})
-
-ipcMain.handle('mod:get-status', async () => {
-  await ensureVersionsDirectory()
-  const versions = []
-  for (const version of launcherConfig.versions) {
-    if (!isInstalled(version.id) && !gameDiscoveryCompleted.has(version.id) &&
-      !gameDiscoveryPromises.has(version.id)) {
-      discoverExistingGameDirectory(version.id).then(directory => {
-        reportGameDiscovery({ versionId: version.id, found: Boolean(directory) })
-      }).catch(error => {
-        console.error(`Could not search for the game folder for ${version.id}:`, error)
-        reportGameDiscovery({ versionId: version.id, found: false, error: error.message })
-      })
-    }
-    const installDirectory = getVersionDirectory(version.id)
-    const installed = isInstalled(version.id)
-    const stats = getVersionStats(version.id)
-    if (installed && !stats.installedAt) {
-      try {
-        stats.installedAt = fs.statSync(path.join(installDirectory, 'AoH2MP.jar')).birthtime.toISOString()
-      } catch (error) {
-        if (error.code !== 'ENOENT') throw error
-      }
-    }
-    versions.push({
-      id: version.id,
-      installed,
-      installDirectory,
-      external: Boolean(gameLocations[version.id]),
-      searching: gameDiscoveryPromises.has(version.id),
-      stats
-    })
-  }
-  return {
-    versionsDirectory: getVersionsDirectory(),
-    versions,
-    java: getJavaExecutable()
-  }
-})
-
-ipcMain.handle('game:get-stats', (_event, versionId) => ({
-  ...getVersionStats(getVersion(versionId).id)
-}))
-
-ipcMain.handle('mod:download', async (event, versionId, commitOverride) => {
-  const version = getVersion(versionId)
-  const commitId = typeof commitOverride === 'string' && commitOverride.trim() ? commitOverride.trim() : version.commit
-  if (!/^[a-f0-9]{40}$/i.test(commitId || '')) {
-    throw new Error(`Для версии ${version.name} ещё не указан опубликованный коммит. Скачивание пока недоступно.`)
-  }
-  if (isInstalled(version.id)) {
-    return { installed: true, installDirectory: getVersionDirectory(version.id) }
-  }
-  return installVersionArchive(version.id, commitId, event.sender)
 })
 
 ipcMain.handle('mod:delete', async (_event, versionId) => {
@@ -1314,8 +1355,8 @@ function createWindow() {
 
   window.loadFile(path.join(__dirname, '..', 'app', 'index.html'))
   window.webContents.on('context-menu', (event, params) => {
-    if (params.isEditable || params.selectionText || params.srcURL) return
-    event.preventDefault()
+      if (params.isEditable) return
+      event.preventDefault()
   })
   window.webContents.on('before-input-event', (event, input) => {
     const active = window.webContents.getFocusedFrame()?.document?.activeElement || null
@@ -1333,6 +1374,7 @@ function createWindow() {
 app.whenReady().then(() => {
   readGameLocations()
   readGameStats()
+  readVersionCommits()
   // check repository-based version file and prompt installer if newer
   checkRepoUpdate().catch(() => {})
   createWindow()

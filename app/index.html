@@ -85,6 +85,7 @@
               </div>
               <div class="version-detail-heading">
                 <div><div class="eyebrow" data-i18n="gameOverview">ОБЗОР ИГРЫ</div><h2 id="version-title">Bloody Europe 1.9.3</h2></div>
+                <span class="update-badge" id="version-update-badge" hidden data-i18n="updateAvailable">Доступно обновление</span>
               </div>
               <div class="game-stats-grid">
                 <div class="game-stat"><span class="stat-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="stat-copy"><small data-i18n="playTime">Время в игре</small><b id="total-playtime">0 ч.</b></span></div>
@@ -96,9 +97,9 @@
               <div class="screenshots-grid version-screenshots" id="version-screenshots" hidden></div>
               <div class="mod-controls">
                 <button class="button-primary mod-action" id="mod-action" disabled><span class="action-icon"></span><span class="action-label">Скачать</span></button>
+                <button class="soft-button mod-update" id="update-mod" hidden><span data-i18n="updateMod">Обновить</span></button>
                 <button class="soft-button mod-delete" id="delete-mod" hidden><img class="icon asset-icon" src="assets/icons/delete.png" alt="" /><span data-i18n="uninstall">Удалить</span></button>
               </div>
-              <div class="version-update-actions" id="version-update-actions"></div>
               <p class="version-availability" id="version-availability" hidden></p>
               <div class="download-progress" id="download-progress" hidden>
                 <div class="download-topline"><div class="download-title"><span class="download-spinner"></span><span id="progress-message">Подготовка загрузки</span></div><span class="progress-percent" id="progress-percent">0%</span></div>
@@ -136,8 +137,7 @@
 
         <section class="page secondary-page" id="page-settings">
           <div class="eyebrow" data-i18n="settingsEyebrow">ПРИЛОЖЕНИЕ</div><h1 data-i18n="settings">Настройки</h1><p class="page-subtitle" data-i18n="settingsSubtitle">Игровые файлы и оформление приложения.</p>
-          <div class="settings-panel"><h2 data-i18n="gameFolder">Папка игры</h2><p data-i18n="gameFolderDescription">Файлы игры хранятся рядом с лаунчером в папке Games.</p><div class="settings-path" id="settings-games-directory">Games</div><button class="soft-button" id="open-mod-folder-settings"><img class="icon asset-icon" src="assets/icons/folder.png" alt="" /><span data-i18n="openGameFolder">Открыть папку игры</span></button><button class="soft-button launch-log-settings" id="open-launch-log"><img class="icon asset-icon" src="assets/icons/log.png" alt="" /><span data-i18n="openLaunchLog">Журнал запуска</span></button><button class="soft-button launch-log-settings" id="open-last-crash-log"><img class="icon asset-icon" src="assets/icons/log.png" alt="" /><span>Лог последнего краша</span></button><div class="launcher-update-panel" id="launcher-update-panel" hidden><span id="launcher-update-message"></span><div class="launcher-update-track"><i id="launcher-update-progress"></i></div></div><button class="soft-button launcher-update-check-button" id="check-launcher-update"><span class="launcher-update-button-label">Проверить обновления</span></button><div class="settings-divider"></div><h2 data-i18n="customizeLauncher">Настройка лаунчера</h2><p data-i18n="customizeDescription">Логотип, баннер, описание и авторы настраиваются в исходниках приложения.</p><p data-i18n="languageSetting">Язык интерфейса можно переключить в правом верхнем углу.</p></div>
-          <div class="settings-panel version-history-panel"><h2>Управление версиями мода</h2><p>История коммитов и откат к предыдущим сборкам без потери сохранений.</p><div class="version-history-list" id="version-history-list"></div></div>
+          <div class="settings-panel"><h2 data-i18n="gameFolder">Папка игры</h2><p data-i18n="gameFolderDescription">Файлы игры хранятся рядом с лаунчером в папке Games.</p><div class="settings-path" id="settings-games-directory">Games</div><button class="soft-button" id="open-mod-folder-settings"><img class="icon asset-icon" src="assets/icons/folder.png" alt="" /><span data-i18n="openGameFolder">Открыть папку игры</span></button><button class="soft-button launch-log-settings" id="open-launch-log"><img class="icon asset-icon" src="assets/icons/log.png" alt="" /><span data-i18n="openLaunchLog">Журнал запуска</span></button><button class="soft-button launch-log-settings" id="open-last-crash"><img class="icon asset-icon" src="assets/icons/crash.png" alt="" /><span data-i18n="openLastCrash">Лог последнего краша</span></button><div class="launcher-update-panel" id="launcher-update-panel" hidden><span id="launcher-update-message"></span><div class="launcher-update-track"><i id="launcher-update-progress"></i></div></div><button class="soft-button launcher-update-check-button" id="check-launcher-update"><span class="launcher-update-button-label">Проверить обновления</span></button><div class="settings-divider"></div><h2 data-i18n="manageModVersions">Управление версиями мода</h2><p data-i18n="manageModVersionsDescription">Выбери коммит из истории репозитория, чтобы установить или откатить мод на нужную версию. Текущая папка сохраняется как резервная копия .bak.</p><div class="commit-list" id="mod-commit-list"></div><div class="settings-divider"></div><h2 data-i18n="customizeLauncher">Настройка лаунчера</h2><p data-i18n="customizeDescription">Логотип, баннер, описание и авторы настраиваются в исходниках приложения.</p><p data-i18n="languageSetting">Язык интерфейса можно переключить в правом верхнем углу.</p></div>
         </section>
       </div>
       <div class="toast" id="toast" role="status"></div>
@@ -186,8 +186,12 @@
       <p data-i18n="crashDescription">Заполни форму, сохрани отчет вместе с журналом и прикрепи файл в поддержку.</p>
       <label class="crash-field"><span data-i18n="crashSubject">Тема</span><input id="crash-subject" maxlength="100" /></label>
       <label class="crash-field"><span data-i18n="crashDetails">Что произошло?</span><textarea id="crash-details" rows="4" maxlength="3000"></textarea></label>
-      <div class="crash-actions"><button class="button-primary" id="create-crash-report" data-i18n="crashCreateReport">Сохранить отчет с логом</button><button class="soft-button" id="report-crash-to-telegram">Сообщить об ошибке</button><button class="soft-button" id="close-crash-dialog" data-i18n="later">Позже</button></div>
-      <p class="crash-footnote" id="crash-telegram-copy-note" hidden>Текст скопирован. Вставьте его в чат и прикрепите файл с логом.</p>
+      <div class="crash-actions"><button class="button-primary" id="create-crash-report" data-i18n="crashCreateReport">Сохранить отчет с логом</button><button class="soft-button" id="send-crash-report" data-i18n="crashSendReport">Сообщить об ошибке</button><button class="soft-button" id="close-crash-dialog" data-i18n="later">Позже</button></div>
+      <div class="crash-report-hint" id="crash-report-hint" hidden>
+        <p data-i18n="crashReportCopied">Текст ошибки скопирован. Вставь его в чат и прикрепи файл журнала.</p>
+        <code id="crash-report-log"></code>
+        <button class="soft-button" id="open-crash-log-folder" data-i18n="crashOpenLogFolder">Открыть папку с логом</button>
+      </div>
       <p class="crash-footnote" data-i18n="crashAttachHint">После сохранения прикрепи отчет к сообщению в Discord поддержки.</p>
     </dialog>
     <dialog class="profile-dialog" id="profile-dialog">
