@@ -1,0 +1,96 @@
+{
+  "branding": {
+    "name": "AOC 2 Multiplayer",
+    "caption": "LAUNCHER",
+    "subtitle": "AGE OF HISTORY II · MULTIPLAYER",
+    "logo": "assets/branding/logo.svg",
+    "launcherCreator": {
+      "name": "GalikX0",
+      "url": "https://t.me/GalikX0"
+    },
+    "modCreator": {
+      "name": "kkun3756",
+      "url": "https://t.me/kkun3756"
+    }
+  },
+  "community": [
+    {
+      "label": "Telegram канал",
+      "labelEn": "Telegram channel",
+      "url": "https://t.me/AOC2MP_by_kkun3756"
+    },
+    {
+      "label": "Discord сервер",
+      "labelEn": "Discord server",
+      "url": "https://discord.gg/qGptr2VAvu"
+    },
+    {
+      "label": "Telegram сообщество",
+      "labelEn": "Telegram community",
+      "url": "https://t.me/communityAOC2mp"
+    }
+  ],
+  "versions": [
+    {
+      "id": "bloody-europe-1.9.3",
+      "version": "1.9.3",
+      "name": "Bloody Europe 1.9.3",
+      "tagline": "Мультиплеерный мод для Age of History II",
+      "taglineEn": "A multiplayer mod for Age of History II",
+      "description": "AoH2MP — мультиплеер для Age of History 2\n\nСоздаёшь комнату (или подключаешься к чужой) — и вот вы уже вдвоём, втроём или больше управляете разными странами на одной и той же карте одновременно.\n\nПодключиться можно через Steam (если игра куплена там — находишь друзей и заходишь к ним в комнату) или просто по локальной сети, если вы рядом на одном Wi-Fi.\n\nЕсть встроенный чат, чтобы договариваться о союзах или объявлять войну прямо в игре",
+      "descriptionEn": "AoH2MP — multiplayer for Age of History 2\n\nCreate a room (or join someone else's) and play together, each controlling different countries on the same map.\n\nConnect through Steam (if you own the game there, find your friends and join their room) or over a local network when you are on the same Wi-Fi.\n\nAn in-game chat lets you negotiate alliances or declare war while you play.",
+      "creator": {
+        "name": "kkun3756",
+        "url": "https://t.me/kkun3756"
+      },
+      "repository": "galichan775-hue/bloody-europe-1.9.3-mp",
+      "commit": "c38ddfa08ba89b85044fff0b43a1530c99b93400",
+      "banner": "assets/versions/1.9.3/banner.webp",
+      "icon": "assets/branding/logo.svg",
+      "screenshots": [],
+      "changes": {
+        "added": [],
+        "changed": [],
+        "removed": []
+      }
+    },
+    {
+      "id": "aoh2mp-1.9.3",
+      "version": "1.9.3",
+      "name": "AoH2MP 1.9.3",
+      "tagline": "Отдельная версия AoH2MP",
+      "taglineEn": "Standalone AoH2MP version",
+      "description": "AoH2MP 1.9.3\n\nОписание версии можно изменить в app/launcher-config.json.",
+      "descriptionEn": "AoH2MP 1.9.3\n\nEdit this version description in app/launcher-config.json.",
+      "creator": {
+        "name": "kkun3756",
+        "url": "https://t.me/kkun3756"
+      },
+      "repository": "galichan775-hue/1.9.3-mp",
+      "commit": "49fb0289272498615a712dd692d9cb08e3bdb5de",
+      "banner": "assets/versions/1.9.3-mp/banner.webp",
+      "icon": "assets/branding/logo.svg",
+      "screenshots": [],
+      "changes": { "added": [], "changed": [], "removed": [] }
+    },
+    {
+      "id": "aoh2mp-1.9.4",
+      "version": "1.9.4",
+      "name": "AoH2MP 1.9.4",
+      "tagline": "Отдельная версия AoH2MP",
+      "taglineEn": "Standalone AoH2MP version",
+      "description": "AoH2MP 1.9.4\n\nОписание версии можно изменить в app/launcher-config.json.",
+      "descriptionEn": "AoH2MP 1.9.4\n\nEdit this version description in app/launcher-config.json.",
+      "creator": {
+        "name": "kkun3756",
+        "url": "https://t.me/kkun3756"
+      },
+      "repository": "galichan775-hue/1.9.4-mp",
+      "commit": "8f811121fb3425f9104fdfd6d125007a8d7ad9fb",
+      "banner": "assets/versions/1.9.4-mp/banner.webp",
+      "icon": "assets/branding/logo.svg",
+      "screenshots": [],
+      "changes": { "added": [], "changed": [], "removed": [] }
+    }
+  ]
+}

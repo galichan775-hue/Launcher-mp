@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1b1b1b" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'" />
+    <title>AOC 2 Multiplayer</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="startup-screen" id="startup-screen">
+      <div class="startup-glow"></div>
+      <img src="assets/branding/logo.svg" alt="" />
+      <b>AOC 2 Multiplayer</b>
+      <span id="startup-message">Запуск...</span>
+      <div class="startup-track"><i></i></div>
+      <div class="startup-update" id="startup-update" hidden>
+        <b id="startup-update-title">Доступно обновление</b>
+        <span id="startup-update-text">Новая версия лаунчера готова к установке.</span>
+        <div class="startup-update-actions">
+          <button class="startup-update-primary" id="startup-update-install" type="button">Обновить</button>
+          <button class="startup-update-secondary" id="startup-update-later" type="button">Позже</button>
+        </div>
+      </div>
+      <div class="startup-window-controls">
+        <button id="startup-minimize" aria-label="Свернуть">−</button>
+        <button id="startup-close" aria-label="Закрыть">×</button>
+      </div>
+    </div>
+    <aside class="sidebar">
+      <a class="brand" href="#" aria-label="AOC 2 Multiplayer — главная">
+        <img class="brand-mark" id="brand-logo" src="assets/branding/logo.svg" alt="" />
+        <span class="brand-wordmark">AOC 2<span class="brand-caption">MULTIPLAYER</span></span>
+      </a>
+
+      <span class="nav-heading">AGE OF HISTORY II</span>
+      <nav class="navigation" aria-label="Основная навигация">
+        <button class="nav-item selected" data-page="library">
+          <span class="nav-icon"><img src="assets/icons/versions-list.png" alt="" /></span><span data-i18n="versions">Версии</span><span class="nav-chevron"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></span>
+        </button>
+        <button class="nav-item" data-page="screenshots"><span class="nav-icon"><img src="assets/icons/info.png" alt="" /></span><span data-i18n="aboutMod">О моде</span></button>
+      </nav>
+
+      <span class="nav-heading settings-heading">ПРИЛОЖЕНИЕ</span>
+      <nav class="navigation">
+        <button class="nav-item" data-page="settings"><span class="nav-icon"><img src="assets/icons/settings.png" alt="" /></span><span data-i18n="settings">Настройки</span></button>
+      </nav>
+
+      <div class="sidebar-spacer"></div>
+
+      <button class="profile-button" id="edit-profile">
+        <span class="profile-avatar" id="sidebar-avatar"><span id="sidebar-avatar-letter">A</span></span>
+        <span class="profile-copy"><b id="sidebar-player-name">Игрок</b><small data-i18n="editProfile">Изменить профиль</small></span><img class="profile-edit-icon" src="assets/icons/edit.png" alt="" />
+      </button>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="breadcrumbs"><span class="crumb-muted">AOC 2</span><span class="crumb-divider">/</span><span id="current-section">Моды</span></div>
+        <div class="topbar-right">
+          <button class="language-picker" id="language-picker" type="button"><img class="language-icon asset-icon" src="assets/icons/language.png" alt="" /><span id="language-current">Русский</span><span class="language-chevron">⌄</span></button>
+          <select id="language-select" aria-label="Language" hidden><option value="ru">Русский</option><option value="en">English</option></select>
+          <div class="window-controls"><button id="window-minimize" aria-label="Свернуть">−</button><button id="window-close" aria-label="Закрыть">×</button></div>
+        </div>
+      </header>
+
+      <div class="page-scroll">
+        <section class="page page-library active" id="page-library">
+          <div class="page-title-row">
+            <div>
+              <div class="eyebrow" id="brand-subtitle">AGE OF HISTORY II · MULTIPLAYER</div>
+              <h1 data-i18n="versions">Версии</h1>
+              <p class="page-subtitle" data-i18n="versionsSubtitle">Управляй игрой и следи за временем в игре.</p>
+            </div>
+            <button class="soft-button" id="open-mod-folder"><img class="icon asset-icon" src="assets/icons/folder.png" alt="" /> <span data-i18n="openGameFolder">Папка игры</span></button>
+          </div>
+
+          <section class="library-section">
+            <div class="section-heading">
+              <div><h2 data-i18n="installedVersionHeading">Установленная версия</h2><p data-i18n="versionListHint">Age of History II · Multiplayer</p></div>
+            </div>
+
+            <div class="profile-grid version-grid" id="version-grid"></div>
+
+            <section class="version-detail" id="version-detail">
+              <div class="version-hero">
+                <img class="version-banner" id="version-banner" src="assets/versions/1.9.3/banner.png" alt="" />
+                <div class="version-hero-overlay"></div>
+                <div class="version-hero-copy"><span class="version-hero-kicker">AO H 2 · MULTIPLAYER</span><h2 id="version-hero-title">Bloody Europe 1.9.3</h2><span class="version-hero-owner" id="version-creator"></span></div>
+              </div>
+              <div class="version-detail-heading">
+                <div><div class="eyebrow" data-i18n="gameOverview">ОБЗОР ИГРЫ</div><h2 id="version-title">Bloody Europe 1.9.3</h2></div>
+                <span class="update-badge" id="version-update-badge" hidden data-i18n="updateAvailable">Доступно обновление</span>
+              </div>
+              <div class="game-stats-grid">
+                <div class="game-stat"><span class="stat-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="stat-copy"><small data-i18n="playTime">Время в игре</small><b id="total-playtime">0 ч.</b></span></div>
+                <div class="game-stat"><span class="stat-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4v5h5M5.6 9A8 8 0 1 1 4 14"/></svg></span><span class="stat-copy"><small data-i18n="lastPlayed">Последний запуск</small><b id="last-played">Ещё не запускалась</b></span></div>
+                <div class="game-stat"><span class="stat-icon"><img src="assets/icons/versions-stack.png" alt="" /></span><span class="stat-copy"><small data-i18n="sessions">Сеансы</small><b id="session-count">0</b></span></div>
+              </div>
+              <p class="version-description collapsed" id="version-description"></p>
+              <button class="description-toggle" id="description-toggle" hidden data-i18n="descriptionExpand">Показать полностью</button>
+              <div class="screenshots-grid version-screenshots" id="version-screenshots" hidden></div>
+              <div class="mod-controls">
+                <button class="button-primary mod-action" id="mod-action" type="button" disabled><span class="action-icon"></span><span class="action-label">Скачать</span></button>
+                <button class="soft-button mod-update" id="update-mod" hidden><span data-i18n="updateMod">Обновить</span></button>
+                <button class="soft-button mod-delete" id="delete-mod" hidden><img class="icon asset-icon" src="assets/icons/delete.png" alt="" /><span data-i18n="uninstall">Удалить</span></button>
+              </div>
+              <p class="version-availability" id="version-availability" hidden></p>
+              <div class="download-progress" id="download-progress" hidden>
+                <div class="download-topline"><div class="download-title"><span class="download-spinner"></span><span id="progress-message">Подготовка загрузки</span></div><span class="progress-percent" id="progress-percent">0%</span></div>
+                <div class="progress-track"><span id="progress-bar"></span><i id="progress-glow"></i></div>
+                <div class="download-metrics"><span id="progress-size">0 МБ / —</span><span id="progress-speed">0 КБ/с</span><span id="progress-eta">Осталось —</span></div>
+                <div class="progress-footnote" id="progress-footnote">Подготовка файлов игры</div>
+              </div>
+            </section>
+
+            <div class="download-destination">
+              <span class="destination-icon"><img src="assets/icons/folder.png" alt="" /></span>
+              <span><b data-i18n="installLocation">Расположение игры</b><small id="games-directory">Папка Games рядом с лаунчером</small></span>
+              <button class="text-button destination-button" id="open-mod-folder-secondary"><span data-i18n="open">Открыть</span><img class="icon asset-icon" src="assets/icons/folder.png" alt="" /></button>
+              <button class="soft-button select-game-folder" id="select-game-folder" data-i18n="selectExistingGame">Выбрать свою папку игры</button>
+              <button class="soft-button reset-game-folder" id="reset-game-folder" data-i18n="resetGameFolder" hidden>Сбросить</button>
+            </div>
+          </section>
+
+          <footer class="bottom-note"><svg class="icon java-note-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 17c-2.5 0-4-1-4-2.3 0-.7.5-1.3 1.3-1.7M16 17c2.5 0 4-1 4-2.3 0-.7-.5-1.3-1.3-1.7M7 18.5c1.2.8 3 1.2 5 1.2s3.8-.4 5-1.2M9 13c-1.5-1.2.9-1.9.9-3.1m3.4 3.1c-1.5-1.2.9-1.9.9-3.1M11 5.5c0 1.2-2.2 1.7-2.2 3"/></svg> <span data-i18n="javaRequired">Для запуска требуется Java 17 или новее.</span></footer>
+        </section>
+
+        <section class="page secondary-page" id="page-screenshots">
+          <div class="eyebrow">AGE OF HISTORY II · AO H 2 MP</div>
+          <h1 data-i18n="aboutMod">О моде</h1>
+          <article class="about-mod-panel">
+            <img class="about-mod-logo" id="about-mod-logo" src="assets/branding/logo.svg" alt="" />
+            <div class="about-mod-copy"><h2 id="about-mod-title">AoH2MP — мультиплеер для Age of History 2</h2><div id="about-mod-description"></div></div>
+          </article>
+          <section class="community-panel about-creators">
+            <div><div class="eyebrow" data-i18n="creators">СОЗДАТЕЛИ</div><h2 data-i18n="projectCreators">Авторы проекта</h2></div>
+            <div class="creator-list" id="about-creator-list"></div>
+            <div class="community-links" id="about-community-links"></div>
+          </section>
+        </section>
+
+        <section class="page secondary-page" id="page-settings">
+          <div class="eyebrow" data-i18n="settingsEyebrow">ПРИЛОЖЕНИЕ</div><h1 data-i18n="settings">Настройки</h1><p class="page-subtitle" data-i18n="settingsSubtitle">Игровые файлы и оформление приложения.</p>
+          <div class="settings-panel"><h2 data-i18n="gameFolder">Папка игры</h2><p data-i18n="gameFolderDescription">Файлы игры хранятся рядом с лаунчером в папке Games.</p><div class="settings-path" id="settings-games-directory">Games</div><button class="soft-button" id="open-mod-folder-settings"><img class="icon asset-icon" src="assets/icons/folder.png" alt="" /><span data-i18n="openGameFolder">Открыть папку игры</span></button><button class="soft-button launch-log-settings" id="open-launch-log"><img class="icon asset-icon" src="assets/icons/log.png" alt="" /><span data-i18n="openLaunchLog">Журнал запуска</span></button><button class="soft-button launch-log-settings" id="open-last-crash"><img class="icon asset-icon" src="assets/icons/crash.png" alt="" /><span data-i18n="openLastCrash">Лог последнего краша</span></button><div class="launcher-update-panel" id="launcher-update-panel" hidden><span id="launcher-update-message"></span><div class="launcher-update-track"><i id="launcher-update-progress"></i></div></div><button class="soft-button launcher-update-check-button" id="check-launcher-update"><span class="launcher-update-button-label">Проверить обновления</span></button><div class="settings-divider"></div><h2 data-i18n="manageModVersions">Управление версиями мода</h2><p data-i18n="manageModVersionsDescription">Выбери коммит из истории репозитория, чтобы установить или откатить мод на нужную версию. Текущая папка сохраняется как резервная копия .bak.</p><div class="commit-list" id="mod-commit-list"></div><div class="settings-divider"></div><h2 data-i18n="customizeLauncher">Настройка лаунчера</h2><p data-i18n="customizeDescription">Логотип, баннер, описание и авторы настраиваются в исходниках приложения.</p><p data-i18n="languageSetting">Язык интерфейса можно переключить в правом верхнем углу.</p><div class="settings-divider"></div><h2 data-i18n="themeTitle">Цвета оформления</h2><p data-i18n="themeDescription">Стандартная тема — как сейчас. Можно выбрать свои цвета: они сохранятся при следующем запуске.</p><div class="theme-editor"><div class="theme-swatches" id="theme-presets"></div><div class="theme-fields"><label class="theme-field"><span data-i18n="themeAccent">Акцент</span><input type="color" id="theme-accent-input" value="#d5d8df" /></label><label class="theme-field"><span data-i18n="themeBackground">Фон</span><input type="color" id="theme-bg-input" value="#1b1b1b" /></label><label class="theme-field theme-field-wide"><span data-i18n="themeGlow">Подсветка</span><input type="color" id="theme-glow-input" value="#54607d" /></label></div><div class="theme-actions"><button class="soft-button" id="theme-reset" type="button" data-i18n="themeReset">Сбросить на стандартную</button></div></div></div>
+        </section>
+      </div>
+      <div class="toast" id="toast" role="status"></div>
+      <div class="notification-stack" id="notification-stack" aria-live="polite" aria-atomic="true"></div>
+    </main>
+
+    <dialog class="java-dialog" id="java-dialog">
+      <div class="java-dialog-icon"><img src="assets/icons/java.png" alt="" /></div>
+      <button class="dialog-close" id="close-java-dialog" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+      <span class="eyebrow" data-i18n="javaRequiredEyebrow">ТРЕБУЕТСЯ JAVA</span>
+      <h2 data-i18n="javaRequiredTitle">Установи Java, чтобы играть</h2>
+      <p data-i18n="javaRequiredDescription">Для запуска AoH2MP нужна Java 17 или новее. Откроем официальную страницу загрузки Java.</p>
+      <div class="java-dialog-actions"><button class="button-primary" id="download-java" data-i18n="downloadJava">Скачать Java 17</button><button class="soft-button" id="check-java" data-i18n="checkJava">Проверить снова</button><button class="soft-button" id="cancel-java" data-i18n="later">Позже</button></div>
+    </dialog>
+    <dialog class="update-dialog" id="update-dialog">
+      <span class="eyebrow">ОБНОВЛЕНИЕ ЛАУНЧЕРА</span>
+      <h2 data-i18n="updateTitle">Обновление готово</h2>
+      <p data-i18n="updateDescription">Новая версия уже скачана. Перезапусти лаунчер, чтобы установить её.</p>
+      <div class="update-dialog-actions"><button class="button-primary" id="install-update" data-i18n="updateInstall">Перезапустить и обновить</button><button class="soft-button" id="later-update" data-i18n="updateLater">Позже</button></div>
+    </dialog>
+    <dialog class="language-dialog" id="language-dialog">
+      <button class="dialog-close" id="close-language-dialog" aria-label="Закрыть">×</button>
+      <span class="eyebrow" data-i18n="languagePickerEyebrow">ИНТЕРФЕЙС</span>
+      <h2 data-i18n="languagePickerTitle">Выбери язык</h2>
+      <div class="language-options">
+        <button class="language-option" data-language="ru"><span class="language-option-flag">RU</span><span><b>Русский</b><small>Russian</small></span><span class="language-option-check"></span></button>
+        <button class="language-option" data-language="en"><span class="language-option-flag">EN</span><span><b>English</b><small>Английский</small></span><span class="language-option-check"></span></button>
+      </div>
+    </dialog>
+    <dialog class="confirm-dialog" id="confirm-dialog">
+      <span class="eyebrow" data-i18n="confirmEyebrow">ПОДТВЕРЖДЕНИЕ</span>
+      <h2 id="confirm-title"></h2>
+      <p id="confirm-message"></p>
+      <div class="confirm-actions"><button class="button-primary" id="confirm-accept"></button><button class="soft-button" id="confirm-cancel"></button></div>
+    </dialog>
+    <dialog class="message-dialog" id="message-dialog">
+      <div class="crash-symbol"><img src="assets/icons/warning.png" alt="" /></div>
+      <h2 id="message-title"></h2>
+      <p id="message-body"></p>
+      <button class="button-primary" id="message-close" data-i18n="closeMessage">Понятно</button>
+    </dialog>
+    <dialog class="crash-dialog" id="crash-dialog">
+      <div class="crash-symbol"><img src="assets/icons/warning.png" alt="" /></div>
+      <span class="eyebrow" data-i18n="crashEyebrow">ОШИБКА ЗАПУСКА</span>
+      <h2 data-i18n="crashTitle">Игра завершилась с ошибкой</h2>
+      <p data-i18n="crashDescription">Заполни форму, сохрани отчет вместе с журналом и прикрепи файл в поддержку.</p>
+      <label class="crash-field"><span data-i18n="crashSubject">Тема</span><input id="crash-subject" maxlength="100" /></label>
+      <label class="crash-field"><span data-i18n="crashDetails">Что произошло?</span><textarea id="crash-details" rows="4" maxlength="3000"></textarea></label>
+      <div class="crash-actions"><button class="button-primary" id="create-crash-report" data-i18n="crashCreateReport">Сохранить отчет с логом</button><button class="soft-button" id="send-crash-report" data-i18n="crashSendReport">Сообщить об ошибке</button><button class="soft-button" id="close-crash-dialog" data-i18n="later">Позже</button></div>
+      <div class="crash-report-hint" id="crash-report-hint" hidden>
+        <p data-i18n="crashReportCopied">Текст ошибки скопирован. Вставь его в чат и прикрепи файл журнала.</p>
+        <code id="crash-report-log"></code>
+        <button class="soft-button" id="open-crash-log-folder" data-i18n="crashOpenLogFolder">Открыть папку с логом</button>
+      </div>
+      <p class="crash-footnote" data-i18n="crashAttachHint">После сохранения прикрепи отчет к сообщению в Discord поддержки.</p>
+    </dialog>
+    <dialog class="profile-dialog" id="profile-dialog">
+      <button class="dialog-close" id="close-profile-dialog" aria-label="Закрыть"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+      <div class="profile-dialog-heading">
+        <span class="profile-avatar profile-dialog-avatar" id="dialog-avatar"><span id="dialog-avatar-letter">A</span></span>
+        <div><span class="eyebrow" data-i18n="playerProfile">ПРОФИЛЬ ИГРОКА</span><h2 data-i18n="editProfileTitle">Настроить профиль</h2></div>
+      </div>
+      <label class="profile-field"><span data-i18n="nickname">Никнейм</span><input id="profile-name-input" type="text" maxlength="24" autocomplete="nickname" /></label>
+      <label class="profile-field"><span data-i18n="avatar">Аватар</span><span class="avatar-file-control"><input id="profile-avatar-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" /><span data-i18n="chooseAvatar">Выбрать изображение</span></span>
+        <div class="avatar-position-controls">
+          <label class="avatar-position-label">Положение</label>
+          <div class="avatar-sliders">
+            <input id="avatar-pos-x" type="range" min="0" max="100" value="50" aria-label="Положение по горизонтали" />
+            <input id="avatar-pos-y" type="range" min="0" max="100" value="50" aria-label="Положение по вертикали" />
+          </div>
+        </div>
+      </label>
+      <div class="profile-dialog-actions"><button class="button-primary" id="save-profile" data-i18n="saveProfile">Сохранить</button><button class="soft-button" id="cancel-profile" data-i18n="cancel">Отмена</button></div>
+    </dialog>
+    <dialog class="preview-dialog" id="preview-dialog"><button class="dialog-close" id="close-preview" aria-label="Закрыть"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button><div class="preview-art art-bloody-europe"><span class="country-shape country-one"></span><span class="country-shape country-two"></span><span class="country-shape country-three"></span><span class="country-shape country-four"></span><span class="country-shape country-five"></span><span class="country-shape country-six"></span><span class="country-shape country-seven"></span><span class="country-shape country-eight"></span></div><span id="preview-title"></span></dialog>
+    <script src="renderer.js"></script>
+  </body>
+</html>
