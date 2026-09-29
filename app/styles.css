@@ -356,12 +356,12 @@ a.community-link:hover { border-color: #6d7177; background: #303236; color: whit
 }
 .status-dot { box-shadow: 0 0 12px #d8e0f166; }
 .topbar { background: linear-gradient(180deg,#1c1e242e,#1c1e2400); }
-.language-picker { display: flex; align-items: center; gap: 6px; height: 29px; padding: 0 8px; border: 1px solid #ffffff16; border-radius: 7px; background: #282a30a6; color: #b5bac4; }
-.language-picker { justify-content: center; height: 32px; min-width: 105px; gap: 9px; padding: 0 10px; border-color: #ffffff20; border-radius: 9px; background: linear-gradient(140deg,#30333b,#24262c); color: #d9dce3; font-size: 10px; cursor: pointer; transition: border-color .15s,background .15s,transform .15s; }
+/* Language control: a compact three-dot ("more") button, as supplied. */
+.language-picker { display: inline-flex; align-items: center; justify-content: center; gap: 0; width: 32px; min-width: 32px; height: 32px; padding: 0; border: 1px solid #ffffff20; border-radius: 9px; background: linear-gradient(140deg,#30333b,#24262c); color: #d9dce3; cursor: pointer; transition: border-color .15s,background .15s,transform .15s; }
 .language-picker:hover { transform: translateY(-1px); border-color: #c0cbe03d; background: linear-gradient(140deg,#3b3e48,#292b32); }
-.language-picker .language-icon { width: 18px; height: 18px; --icon-color: #dbdbdb; }
-.language-chevron { margin-left: auto; color: #959baa; font-size: 13px; }
-.language-icon { width: 14px; height: 14px; color: #b7bdc8; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.language-picker .language-icon { width: 18px; height: 18px; --icon-color: #d9dde5; }
+.language-picker #language-current { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.language-icon { width: 14px; height: 14px; }
 .page.active { animation: page-arrive .22s ease-out both; }
 @keyframes page-arrive { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 .eyebrow { color: #c6cad2; }
@@ -531,6 +531,14 @@ a.community-link:hover { border-color: #6d7177; background: #303236; color: whit
 .startup-update-primary:disabled { opacity: .55; cursor: default; }
 .startup-update-secondary { border-color: #ffffff24; background: #ffffff0f; color: #ccd1db; }
 .startup-update-secondary:hover { background: #ffffff1c; color: #f2f4f8; }
+/* Download feedback: without this a 96 MB fetch looks like a frozen app. */
+.startup-update-progress { display: flex; align-items: center; gap: 9px; width: 100%; margin-top: 3px; }
+.startup-update-progress[hidden] { display: none; }
+.startup-update-bar { position: relative; flex: 1; height: 4px; overflow: hidden; border-radius: 4px; background: #ffffff1f; }
+.startup-update-bar i { display: block; width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#aab6ca,#f0e0c8 55%,#c4a7a6); transition: width .18s ease; }
+.startup-update-progress span { min-width: 92px; font-size: 10px; font-variant-numeric: tabular-nums; text-align: right; color: #aeb4c1; }
+.startup-update-error { margin: 4px 0 0; font-size: 10px; line-height: 1.45; color: #f0a7a7; text-align: center; }
+.startup-update-error[hidden] { display: none; }
 .startup-window-controls { position: absolute; top: 10px; right: 12px; display: flex; gap: 5px; -webkit-app-region: no-drag; }
 .startup-window-controls button { font-size: 19px; }
 @keyframes startup-loading { from { transform: translateX(-110%); } to { transform: translateX(370%); } }
@@ -636,7 +644,8 @@ a.community-link:hover { border-color: #6d7177; background: #303236; color: whit
 
 .nav-back { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px 0 10px; font-size: 10px; }
 .nav-back[hidden] { display: none; }
-.nav-back-chevron { display: inline-flex; transition: transform 0.15s ease; }
+.nav-back-chevron { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; transition: transform 0.15s ease; }
+.nav-back-chevron img, .nav-back-chevron .themed-icon { width: 15px; height: 15px; --icon-color: #cdd3dd; }
 .nav-back:hover .nav-back-chevron { transform: translateX(-2px); }
 
 .page-library[data-view="list"] .version-detail { display: none; }

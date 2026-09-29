@@ -42,25 +42,57 @@ const RAW_BASE = 'https://raw.githubusercontent.com/galichan775-hue/Launcher-mp/
 
 function fetchText(url) {
   return new Promise((resolve, reject) => {
-    https.get(url, (res) => {
-      if (res.statusCode !== 200) return reject(new Error('HTTP ' + res.statusCode))
+    const request = https.get(url, (res) => {
+      if (res.statusCode !== 200) { res.resume(); return reject(new Error('HTTP ' + res.statusCode)) }
       let data = ''
       res.setEncoding('utf8')
       res.on('data', chunk => data += chunk)
       res.on('end', () => resolve(data))
-    }).on('error', reject)
+    })
+    // A hung socket must not hold the startup screen hostage.
+    request.setTimeout(8000, () => request.destroy(new Error('timeout')))
+    request.on('error', reject)
   })
 }
 
-function downloadFile(url, dest) {
+// Downloads with byte-level progress so a ~96 MB installer never looks like a frozen app.
+// Follows redirects and enforces a timeout, otherwise a half-open socket hangs the update button.
+function downloadFile(url, dest, onProgress, redirectsLeft = 5) {
   return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(dest)
-    https.get(url, (res) => {
-      if (res.statusCode !== 200) return reject(new Error('HTTP ' + res.statusCode))
+    let settled = false
+    const fail = err => {
+      if (settled) return
+      settled = true
+      try { fs.unlinkSync(dest) } catch {}
+      reject(err)
+    }
+    const request = https.get(url, res => {
+      if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
+        res.resume()
+        if (redirectsLeft <= 0) return fail(new Error('Too many redirects'))
+        file.close()
+        return resolve(downloadFile(new URL(res.headers.location, url).toString(), dest, onProgress, redirectsLeft - 1))
+      }
+      if (res.statusCode !== 200) {
+        res.resume()
+        return fail(new Error('HTTP ' + res.statusCode))
+      }
+      const total = Number(res.headers['content-length']) || 0
+      let received = 0
+      res.on('data', chunk => {
+        received += chunk.length
+        if (onProgress) {
+          try { onProgress({ received, total, percent: total ? Math.min(100, Math.round(received / total * 100)) : 0 }) } catch {}
+        }
+      })
+      res.on('error', fail)
       res.pipe(file)
-      file.on('finish', () => file.close(() => resolve(dest)))
-      file.on('error', err => { try{fs.unlinkSync(dest)}catch{}; reject(err) })
-    }).on('error', reject)
+      file.on('finish', () => file.close(() => { if (!settled) { settled = true; resolve(dest) } }))
+      file.on('error', fail)
+    })
+    request.setTimeout(30000, () => { request.destroy(new Error('Превышено время ожидания ответа сервера.')) })
+    request.on('error', fail)
   })
 }
 
@@ -76,6 +108,8 @@ function semverGt(a, b) {
   return false
 }
 
+// Collects every advertised version and returns the highest one, so a stale
+// Vers-1.txt can never hide a newer latest.txt.
 async function resolveRemoteVersion(local) {
   const candidates = [
     'update/Vers-1.txt',
@@ -84,15 +118,17 @@ async function resolveRemoteVersion(local) {
     `v${local}.txt`,
     `${local}.txt`
   ]
+  const found = []
   for (const candidate of candidates) {
     try {
-      const text = (await fetchText(RAW_BASE + candidate)).trim()
-      if (text) return text.replace(/^v/, '').trim()
+      const text = (await fetchText(RAW_BASE + candidate)).trim().replace(/^v/, '').trim()
+      if (/^\d+(\.\d+)*$/.test(text)) found.push(text)
     } catch (e) {
       // ignore and try next
     }
   }
-  return null
+  if (!found.length) return null
+  return found.reduce((best, value) => (semverGt(value, best) ? value : best))
 }
 
 // Reports the repository version without any native dialog: the renderer shows the prompt
@@ -109,14 +145,28 @@ async function checkRepoUpdate() {
   }
 }
 
+function broadcastUpdateProgress(payload) {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.webContents.send('repo:update-progress', payload)
+  }
+}
+
 async function applyRepoUpdate() {
   const current = app.getVersion()
   const latest = await resolveRemoteVersion(current)
-  if (!latest || !semverGt(latest, current)) throw new Error('Установленная версия уже актуальна.')
+  // Nothing to do is a normal outcome, not a failure: the prompt must simply close.
+  if (!latest || !semverGt(latest, current)) return { started: false, upToDate: true, current }
   const dest = path.join(app.getPath('temp'), 'AOC-2-Multiplayer-Setup.exe')
-  await downloadFile(RAW_BASE + 'AOC-2-Multiplayer-Setup.exe', dest)
+  broadcastUpdateProgress({ phase: 'download', received: 0, total: 0, percent: 0, version: latest })
+  await downloadFile(RAW_BASE + 'AOC-2-Multiplayer-Setup.exe', dest, ({ received, total, percent }) => {
+    broadcastUpdateProgress({ phase: 'download', received, total, percent, version: latest })
+  })
+  broadcastUpdateProgress({ phase: 'launch', percent: 100, version: latest })
   const launchError = await shell.openPath(dest)
-  if (launchError) throw new Error(launchError)
+  if (launchError) {
+    try { fs.unlinkSync(dest) } catch {}
+    throw new Error(launchError)
+  }
   // The installer cannot overwrite a running executable, so step aside and let it take over.
   setTimeout(() => app.quit(), 1200)
   return { started: true, version: latest }

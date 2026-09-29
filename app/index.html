@@ -18,6 +18,11 @@
       <div class="startup-update" id="startup-update" hidden>
         <b id="startup-update-title">Доступно обновление</b>
         <span id="startup-update-text">Новая версия лаунчера готова к установке.</span>
+        <div class="startup-update-progress" id="startup-update-progress" hidden>
+          <div class="startup-update-bar"><i id="startup-update-bar"></i></div>
+          <span id="startup-update-status">0%</span>
+        </div>
+        <p class="startup-update-error" id="startup-update-error" hidden></p>
         <div class="startup-update-actions">
           <button class="startup-update-primary" id="startup-update-install" type="button">Обновить</button>
           <button class="startup-update-secondary" id="startup-update-later" type="button">Позже</button>
@@ -58,10 +63,10 @@
     <main class="main">
       <header class="topbar">
         <div class="topbar-left">
-          <button class="soft-button nav-back" id="back-to-library" type="button" hidden><span class="nav-back-chevron"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></span><span data-i18n="back">Назад</span></button>
+          <button class="soft-button nav-back" id="back-to-library" type="button" hidden><span class="nav-back-chevron"><img class="asset-icon" src="assets/icons/back-arrow.png" alt="" /></span><span data-i18n="back">Назад</span></button>
         </div>
         <div class="topbar-right">
-          <button class="language-picker" id="language-picker" type="button"><img class="language-icon asset-icon" src="assets/icons/language.png" alt="" /><span id="language-current">Русский</span><span class="language-chevron">⌄</span></button>
+          <button class="language-picker" id="language-picker" type="button" title="Language" aria-label="Language"><img class="language-icon asset-icon" src="assets/icons/more-dots.png" alt="" /><span id="language-current">Русский</span></button>
           <select id="language-select" aria-label="Language" hidden><option value="ru">Русский</option><option value="en">English</option></select>
           <div class="window-controls"><button id="window-minimize" aria-label="Свернуть">−</button><button id="window-close" aria-label="Закрыть">×</button></div>
         </div>

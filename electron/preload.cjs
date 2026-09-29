@@ -33,6 +33,11 @@ contextBridge.exposeInMainWorld('aocLauncher', Object.freeze({
     ipcRenderer.on('mod:download-progress', listener)
     return () => ipcRenderer.removeListener('mod:download-progress', listener)
   },
+  onRepoUpdateProgress: callback => {
+    const listener = (_event, progress) => callback(progress)
+    ipcRenderer.on('repo:update-progress', listener)
+    return () => ipcRenderer.removeListener('repo:update-progress', listener)
+  },
   onGameDiscovery: callback => {
     const listener = (_event, result) => callback(result)
     ipcRenderer.on('mod:game-discovery', listener)

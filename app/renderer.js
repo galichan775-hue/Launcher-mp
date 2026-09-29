@@ -532,6 +532,11 @@ function setLanguage(nextLanguage) {
   document.documentElement.lang = language
   document.getElementById('language-select').value = language
   document.getElementById('language-select').setAttribute('aria-label', t('language'))
+  const languagePicker = document.getElementById('language-picker')
+  if (languagePicker) {
+    languagePicker.setAttribute('aria-label', t('language'))
+    languagePicker.setAttribute('title', t('language'))
+  }
   document.getElementById('language-current').textContent = language === 'en' ? 'English' : 'Русский'
   document.querySelectorAll('.language-option').forEach(option => {
     option.classList.toggle('selected', option.dataset.language === language)
@@ -1501,46 +1506,116 @@ function hideStartupScreen() {
   const startupScreen = document.getElementById('startup-screen')
   if (!startupScreen) return
   startupScreen.classList.add('startup-screen-leaving')
-  setTimeout(() => startupScreen.remove(), 650)
+  // The node is kept on purpose: .remove() would make every later update prompt
+  // impossible, because its buttons are bound once at script load.
+}
+
+// Lets the prompt come back (manual re-check) without a restart.
+function resetStartupScreen() {
+  const startupScreen = document.getElementById('startup-screen')
+  if (!startupScreen) return
+  startupScreen.classList.remove('startup-screen-leaving')
+}
+
+const updateCard = {
+  root: document.getElementById('startup-update'),
+  install: document.getElementById('startup-update-install'),
+  later: document.getElementById('startup-update-later'),
+  text: document.getElementById('startup-update-text'),
+  progress: document.getElementById('startup-update-progress'),
+  bar: document.getElementById('startup-update-bar'),
+  status: document.getElementById('startup-update-status'),
+  error: document.getElementById('startup-update-error')
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return ''
+  return bytes >= 1048576 ? (bytes / 1048576).toFixed(1) + ' MB' : Math.round(bytes / 1024) + ' KB'
+}
+
+function setUpdateProgress({ percent, received, total, phase }) {
+  if (!updateCard.progress) return
+  if (phase === 'launch') {
+    updateCard.bar.style.width = '100%'
+    updateCard.status.textContent = '100%'
+    return
+  }
+  updateCard.progress.hidden = false
+  const value = Math.max(0, Math.min(100, Number(percent) || 0))
+  updateCard.bar.style.width = value + '%'
+  const size = total ? ` · ${formatBytes(received)} / ${formatBytes(total)}` : ''
+  updateCard.status.textContent = `${value}%${size}`
+}
+
+function showUpdateError(message) {
+  if (!updateCard.error) {
+    notify(message, true)
+    return
+  }
+  updateCard.error.textContent = message
+  updateCard.error.hidden = false
+  updateCard.progress.hidden = true
+  notify(message, true)
+}
+
+function closeUpdatePrompt() {
+  updatePromptOpen = false
+  pendingRepoUpdate = null
+  if (updateCard.root) updateCard.root.hidden = true
+  if (updateCard.error) { updateCard.error.hidden = true; updateCard.error.textContent = '' }
+  if (updateCard.progress) updateCard.progress.hidden = true
+  if (updateCard.install) { updateCard.install.disabled = false }
+  hideStartupScreen()
 }
 
 function showStartupUpdate(update) {
   pendingRepoUpdate = update
   updatePromptOpen = true
+  // The screen may already be faded out from a previous pass, and the card lives inside it.
+  resetStartupScreen()
   document.getElementById('startup-update-title').textContent = t('startupUpdateTitle')
-  document.getElementById('startup-update-text').textContent = t('startupUpdateText', { version: update.latest })
-  document.getElementById('startup-update-install').textContent = t('startupUpdateInstall')
-  document.getElementById('startup-update-later').textContent = t('startupUpdateLater')
-  document.getElementById('startup-update').hidden = false
+  updateCard.text.textContent = t('startupUpdateText', { version: update.latest })
+  updateCard.install.textContent = t('startupUpdateInstall')
+  updateCard.later.textContent = t('startupUpdateLater')
+  updateCard.root.hidden = false
+  if (updateCard.error) { updateCard.error.hidden = true; updateCard.error.textContent = '' }
+  if (updateCard.progress) updateCard.progress.hidden = true
+  if (updateCard.bar) updateCard.bar.style.width = '0%'
+  updateCard.install.disabled = false
   // The load is finished, so drop the spinner and the stale "checking for updates" caption.
   const track = document.querySelector('.startup-track')
   if (track) track.hidden = true
   const startupMessage = document.getElementById('startup-message')
   if (startupMessage) startupMessage.textContent = ''
-  const install = document.getElementById('startup-update-install')
-  const later = document.getElementById('startup-update-later')
-  if (install) install.focus()
-  if (later) later.classList.add('is-recommended')
+  updateCard.install.focus()
 }
 
-document.getElementById('startup-update-install').addEventListener('click', async () => {
+window.aocLauncher.onRepoUpdateProgress(payload => {
+  if (!updatePromptOpen || !payload) return
+  setUpdateProgress(payload)
+})
+
+updateCard.install.addEventListener('click', async () => {
   if (!pendingRepoUpdate) return
-  const button = document.getElementById('startup-update-install')
-  const startupMessage = document.getElementById('startup-message')
-  button.disabled = true
-  startupMessage.textContent = t('startupUpdateDownloading', { version: pendingRepoUpdate.latest })
+  const version = pendingRepoUpdate.latest
+  updateCard.install.disabled = true
+  if (updateCard.error) { updateCard.error.hidden = true; updateCard.error.textContent = '' }
+  updateCard.text.textContent = t('startupUpdateDownloading', { version })
+  setUpdateProgress({ percent: 0, received: 0, total: 0, phase: 'download' })
   try {
-    await window.aocLauncher.applyRepoUpdate()
-    startupMessage.textContent = t('startupUpdateStarted')
+    const result = await window.aocLauncher.applyRepoUpdate()
+    // The version was already current: that is not an error, just close the gate.
+    if (result && result.upToDate) { closeUpdatePrompt(); return }
+    updateCard.text.textContent = t('startupUpdateStarted')
+    setUpdateProgress({ percent: 100, phase: 'launch' })
   } catch (error) {
-    button.disabled = false
-    notify(error.message || t('updateError'), true)
+    updateCard.install.disabled = false
+    updateCard.text.textContent = t('startupUpdateText', { version })
+    setUpdateProgress({ percent: 0, phase: 'download' })
+    showUpdateError(error.message || t('updateError'))
   }
 })
-document.getElementById('startup-update-later').addEventListener('click', () => {
-  updatePromptOpen = false
-  hideStartupScreen()
-})
+updateCard.later.addEventListener('click', closeUpdatePrompt)
 // The prompt is a decision gate: no Escape, no backdrop, no window close until it is answered.
 document.addEventListener('keydown', event => {
   if (!updatePromptOpen) return
@@ -1569,7 +1644,9 @@ async function runStartupSequence() {
     Promise.all([versionsReady, modUpdates]),
     wait(8000)
   ])
-  const repoUpdate = await Promise.race([repoUpdateCheck, wait(3500).then(() => null)])
+  // Await the real answer: the old Promise.race silently dropped slow checks,
+  // so a real update could go unannounced on a slow connection.
+  const repoUpdate = await repoUpdateCheck
   if (repoUpdate?.available) {
     showStartupUpdate(repoUpdate)
     return
