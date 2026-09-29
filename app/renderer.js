@@ -49,6 +49,13 @@ const translations = {
     gameFolderDescription: 'Файлы игры хранятся рядом с лаунчером в папке Games.',
     customizeLauncher: 'Настройка лаунчера',
     customizeDescription: 'Логотип, баннер, описание и авторы настраиваются в исходниках приложения.',
+    themeTitle: 'Цвета оформления',
+    themeDescription: 'Стандартная тема — как сейчас. Можно выбрать свои цвета: они сохранятся при следующем запуске.',
+    themeAccent: 'Акцент',
+    themeBackground: 'Фон',
+    themeGlow: 'Подсветка',
+    themeReset: 'Сбросить на стандартную',
+    themeHex: 'HEX',
   themeTitle: 'Цвета оформления',
   themeDescription: 'Стандартная тема — как сейчас. Можно выбрать свои цвета: они сохранятся при следующем запуске.',
   themeAccent: 'Акцент',
@@ -102,7 +109,6 @@ const translations = {
     launchedToast: 'Игра закрыта · статистика обновлена',
     language: 'Язык интерфейса',
     stoppingGame: 'Останавливаю игру…',
-    updateChecking: 'Проверка обновления...',
     startupInitializing: 'Инициализация...',
     startupLoadingVersions: 'Загрузка версий...',
     startupCheckingUpdates: 'Проверка обновлений...',
@@ -113,14 +119,7 @@ const translations = {
     startupUpdateLater: 'Позже',
     startupUpdateDownloading: 'Загружаю обновление {version}...',
     startupUpdateStarted: 'Установщик запущен. Завершите обновление и перезапустите лаунчер.',
-    updateDownloading: 'Загружаем обновление лаунчера',
-    updateReady: 'Обновление лаунчера загружено. Перезапусти лаунчер для установки.',
-    updateInstall: 'Перезапустить и обновить',
-    updateLater: 'Позже',
-    updateTitle: 'Обновление готово',
-    updateDescription: 'Новая версия уже скачана. Перезапусти лаунчер, чтобы установить её.',
     updateError: 'Не удалось проверить обновление лаунчера.',
-    launcherUpToDate: 'Установлена последняя версия лаунчера.',
     languagePickerEyebrow: 'ИНТЕРФЕЙС',
     languagePickerTitle: 'Выбери язык',
     confirmEyebrow: 'ПОДТВЕРЖДЕНИЕ',
@@ -212,6 +211,13 @@ const translations = {
     gameFolderDescription: 'Game files are stored in a Games folder beside the launcher.',
     customizeLauncher: 'Customize the launcher',
     customizeDescription: 'The logo, banner, description and creators are configured in the app source files.',
+    themeTitle: 'Theme colours',
+    themeDescription: 'The default theme is what you see now. Pick your own colours and they will be kept for the next launch.',
+    themeAccent: 'Accent',
+    themeBackground: 'Background',
+    themeGlow: 'Glow',
+    themeReset: 'Reset to default',
+    themeHex: 'HEX',
   themeTitle: 'Appearance colours',
   themeDescription: 'The default theme matches the current look. Pick your own colours and they will be kept on next launch.',
   themeAccent: 'Accent',
@@ -265,7 +271,6 @@ const translations = {
     launchedToast: 'Game closed · stats updated',
     language: 'Interface language',
     stoppingGame: 'Stopping the game…',
-    updateChecking: 'Checking for updates...',
     startupInitializing: 'Initializing...',
     startupLoadingVersions: 'Loading versions...',
     startupCheckingUpdates: 'Checking for updates...',
@@ -276,14 +281,7 @@ const translations = {
     startupUpdateLater: 'Later',
     startupUpdateDownloading: 'Downloading update {version}...',
     startupUpdateStarted: 'Installer started. Finish the update and restart the launcher.',
-    updateDownloading: 'Downloading launcher update',
-    updateReady: 'Launcher update downloaded. Restart to install it.',
-    updateInstall: 'Restart and update',
-    updateLater: 'Later',
-    updateTitle: 'Update ready',
-    updateDescription: 'The new version is downloaded. Restart the launcher to install it.',
     updateError: 'Could not check for launcher updates.',
-    launcherUpToDate: 'The launcher is up to date.',
     languagePickerEyebrow: 'INTERFACE',
     languagePickerTitle: 'Choose a language',
     confirmEyebrow: 'CONFIRMATION',
@@ -334,6 +332,7 @@ const versionGrid = document.getElementById('version-grid')
 const versionStates = new Map()
 const versionUpdates = new Map()
 let pendingRepoUpdate = null
+let updatePromptOpen = false
 const toast = document.getElementById('toast')
 const notificationStack = document.getElementById('notification-stack')
 const libraryPage = document.getElementById('page-library')
@@ -557,14 +556,7 @@ function setLibraryView(view) {
 }
 
 function updateSectionTitle() {
-  const section = document.getElementById('current-section')
-  if (libraryPage.dataset.view === 'version' && selectedVersion) {
-    section.textContent = selectedVersion.name
-    return
-  }
-  const active = document.querySelector('.page.active')
-  const key = active?.id === 'page-screenshots' ? 'aboutMod' : active?.id === 'page-settings' ? 'settings' : 'versions'
-  section.textContent = t(key)
+  // The breadcrumb header was removed, so there is no section caption left to update.
 }
 
 function navigate(name) {
@@ -786,9 +778,8 @@ function renderConfig(nextConfig) {
   document.getElementById('brand-logo').alt = `${branding.name} logo`
   document.querySelector('.brand').setAttribute('aria-label', `${branding.name} — ${t('versions')}`)
   document.querySelector('.brand-wordmark').firstChild.textContent = branding.name
-  document.querySelector('.brand-caption').textContent = branding.caption
-  document.querySelector('.crumb-muted').textContent = branding.name
-  document.getElementById('brand-subtitle').textContent = branding.subtitle
+document.querySelector('.brand-caption').textContent = branding.caption
+document.getElementById('brand-subtitle').textContent = branding.subtitle
   const aboutDescription = language === 'en'
     ? selectedVersion?.descriptionEn || selectedVersion?.taglineEn || t('aboutPlaceholder')
     : selectedVersion?.description || selectedVersion?.tagline || t('aboutPlaceholder')
@@ -802,6 +793,9 @@ function renderConfig(nextConfig) {
 
   versionGrid.replaceChildren()
   for (const version of config.versions) {
+    // Singleplayer entries ride along with another version's files, so they stay hidden
+    // until that version is actually installed.
+    if (version.requires && !versionStates.get(version.requires)?.installed) continue
     const card = document.createElement('article')
     card.className = 'version-card'
     card.tabIndex = 0
@@ -842,7 +836,10 @@ function renderConfig(nextConfig) {
 
     const metadata = document.createElement('div')
     metadata.className = 'version-card-metadata'
-    for (const label of ['Age of History II', 'Multiplayer', 'Java 17+']) {
+    const modeLabel = version.kind === 'singleplayer'
+      ? (language === 'en' ? 'Singleplayer' : 'Одиночная')
+      : 'Multiplayer'
+    for (const label of ['Age of History II', modeLabel, 'Java 17+']) {
       const chip = document.createElement('span')
       chip.textContent = label
       metadata.append(chip)
@@ -1439,30 +1436,12 @@ for (const id of ['window-minimize', 'startup-minimize']) {
   document.getElementById(id).addEventListener('click', () => window.aocLauncher.minimizeWindow())
 }
 for (const id of ['window-close', 'startup-close']) {
-  document.getElementById(id).addEventListener('click', () => window.aocLauncher.closeWindow())
+  document.getElementById(id).addEventListener('click', () => {
+    if (updatePromptOpen) return
+    window.aocLauncher.closeWindow()
+  })
 }
 backToLibrary.addEventListener('click', () => setLibraryView('list'))
-document.getElementById('install-update').addEventListener('click', async () => {
-  if (pendingRepoUpdate) {
-    const update = pendingRepoUpdate
-    pendingRepoUpdate = null
-    document.getElementById('update-dialog').close()
-    const button = document.getElementById('startup-update-install')
-    const startupMessage = document.getElementById('startup-message')
-    if (button) button.disabled = true
-    if (startupMessage) startupMessage.textContent = t('startupUpdateDownloading', { version: update.latest })
-    try {
-      await window.aocLauncher.applyRepoUpdate()
-      if (startupMessage) startupMessage.textContent = t('startupUpdateStarted')
-    } catch (error) {
-      if (button) button.disabled = false
-      notify(error.message || t('updateError'), true)
-    }
-    return
-  }
-  window.aocLauncher.installUpdate()
-})
-document.getElementById('later-update').addEventListener('click', () => document.getElementById('update-dialog').close())
 document.getElementById('close-crash-dialog').addEventListener('click', () => document.getElementById('crash-dialog').close())
 document.getElementById('create-crash-report').addEventListener('click', async () => {
   if (!crashVersionId) return
@@ -1518,25 +1497,6 @@ window.aocLauncher.onGameExit(({ versionId, error } = {}) => {
 window.aocLauncher.onStatusChange(() => {
   refreshInstallStateOnly()
 })
-window.aocLauncher.onUpdateStatus(status => {
-  const startupMessage = document.getElementById('startup-message')
-  if (status.phase === 'checking') {
-    startupMessage.textContent = t('updateChecking')
-  } else if (status.phase === 'current') {
-    startupMessage.textContent = t('launcherUpToDate')
-  } else if (status.phase === 'available') {
-    startupMessage.textContent = `${t('updateDownloading')} · ${status.version}`
-    notify(t('updateDownloading'))
-  } else if (status.phase === 'downloading') {
-    startupMessage.textContent = `${t('updateDownloading')} · ${status.percent}%`
-  } else if (status.phase === 'downloaded') {
-    document.getElementById('update-dialog').showModal()
-    notify(t('updateReady'))
-  } else if (status.phase === 'error') {
-    console.warn('Launcher update check failed:', status.message)
-  }
-})
-
 function hideStartupScreen() {
   const startupScreen = document.getElementById('startup-screen')
   if (!startupScreen) return
@@ -1546,6 +1506,7 @@ function hideStartupScreen() {
 
 function showStartupUpdate(update) {
   pendingRepoUpdate = update
+  updatePromptOpen = true
   document.getElementById('startup-update-title').textContent = t('startupUpdateTitle')
   document.getElementById('startup-update-text').textContent = t('startupUpdateText', { version: update.latest })
   document.getElementById('startup-update-install').textContent = t('startupUpdateInstall')
@@ -1556,6 +1517,10 @@ function showStartupUpdate(update) {
   if (track) track.hidden = true
   const startupMessage = document.getElementById('startup-message')
   if (startupMessage) startupMessage.textContent = ''
+  const install = document.getElementById('startup-update-install')
+  const later = document.getElementById('startup-update-later')
+  if (install) install.focus()
+  if (later) later.classList.add('is-recommended')
 }
 
 document.getElementById('startup-update-install').addEventListener('click', async () => {
@@ -1572,7 +1537,15 @@ document.getElementById('startup-update-install').addEventListener('click', asyn
     notify(error.message || t('updateError'), true)
   }
 })
-document.getElementById('startup-update-later').addEventListener('click', hideStartupScreen)
+document.getElementById('startup-update-later').addEventListener('click', () => {
+  updatePromptOpen = false
+  hideStartupScreen()
+})
+// The prompt is a decision gate: no Escape, no backdrop, no window close until it is answered.
+document.addEventListener('keydown', event => {
+  if (!updatePromptOpen) return
+  if (event.key === 'Escape') event.preventDefault()
+}, true)
 
 async function runStartupSequence() {
   const startupMessage = document.getElementById('startup-message')
@@ -1588,15 +1561,12 @@ async function runStartupSequence() {
   const modUpdates = checkModUpdates()
   await wait(300)
   startupMessage.textContent = t('startupCheckingUpdates')
-  const updateCheck = window.aocLauncher.checkForUpdates().catch(error => {
-    console.warn('Launcher update check failed:', error)
-  })
   const repoUpdateCheck = window.aocLauncher.checkRepoUpdate().catch(error => {
     console.warn('Repository update check failed:', error)
     return null
   })
   await Promise.race([
-    Promise.all([versionsReady, updateCheck, modUpdates]),
+    Promise.all([versionsReady, modUpdates]),
     wait(8000)
   ])
   const repoUpdate = await Promise.race([repoUpdateCheck, wait(3500).then(() => null)])
@@ -1610,11 +1580,48 @@ async function runStartupSequence() {
   hideStartupScreen()
 }
 
+document.addEventListener('keydown', event => {
+  if (!event.ctrlKey) return
+  const key = event.key.toLowerCase()
+  if (key !== 'a' && key !== 'c') return
+  const active = document.activeElement
+  if (active && active.closest && active.closest('input, textarea, [contenteditable="true"]')) return
+  event.preventDefault()
+})
+
 renderProfile()
 refreshStatus()
 setInterval(refreshStats, 1000)
 runStartupSequence()
 setInterval(checkModUpdates, 30 * 60 * 1000)
+
+// Icons are monochrome PNGs. Recolouring them with a filter is fixed at build time, so
+// they never follow the theme. Replace each one with a span masked by the same PNG and
+// filled with --icon-color, which makes the icon follow the theme accent.
+;(() => {
+  const ICON_SELECTOR = 'img[src*="assets/icons/"]'
+  const themeIcons = (root = document) => {
+    root.querySelectorAll(ICON_SELECTOR).forEach(img => {
+      if (img.dataset.themedIcon === '1') return
+      const span = document.createElement('span')
+      span.className = `${img.className} themed-icon`.trim()
+      span.dataset.themedIcon = '1'
+      span.style.setProperty('--icon-mask', `url("${img.getAttribute('src')}")`)
+      span.setAttribute('aria-hidden', 'true')
+      img.replaceWith(span)
+    })
+  }
+  themeIcons()
+  new MutationObserver(records => {
+    for (const record of records) {
+      for (const node of record.addedNodes) {
+        if (node.nodeType !== Node.ELEMENT_NODE) continue
+        if (node.matches && node.matches(ICON_SELECTOR)) themeIcons(node.parentNode || document)
+        themeIcons(node)
+      }
+    }
+  }).observe(document.documentElement, { childList: true, subtree: true })
+})()
 
 ;(() => {
   const STORAGE_KEY = 'aoc-theme'
@@ -1695,9 +1702,25 @@ setInterval(checkModUpdates, 30 * 60 * 1000)
   const resetButton = document.getElementById('theme-reset')
   if (!accentInput || !bgInput || !glowInput || !presetBox || !resetButton) return
 
-  accentInput.value = theme.accent
-  bgInput.value = theme.background
-  glowInput.value = theme.glow
+  const popover = document.getElementById('color-popover')
+  const popoverGrid = document.getElementById('color-popover-grid')
+  const popoverHex = document.getElementById('color-popover-hex-input')
+  const CHIPS = [
+    { node: accentInput, key: 'accent' },
+    { node: bgInput, key: 'background' },
+    { node: glowInput, key: 'glow' }
+  ]
+  const PALETTE = [
+    '#ffffff', '#d5d8df', '#a6a6a6', '#7c7c7c', '#545454', '#2b2b2b', '#1b1b1b', '#101010',
+    '#b9bdff', '#8fa3c8', '#79c6e8', '#7fd6ae', '#c3a6f0', '#e8b878', '#f08a8a', '#e05c5c',
+    '#d5d8df', '#414855', '#3d4a63', '#2f6b56', '#5b3f86', '#7a5426', '#7d3232', '#2b6480',
+    '#1b1b1b', '#191b1f', '#131a18', '#1a1622', '#1e1913', '#1f1518', '#121a1f', '#101010'
+  ]
+  let activeChip = null
+
+  const paintChips = () => {
+    CHIPS.forEach(({ node, key }) => node.style.setProperty('--chip-color', theme[key]))
+  }
 
   const markActivePreset = () => {
     presetBox.querySelectorAll('.theme-swatch').forEach(node => {
@@ -1708,19 +1731,76 @@ setInterval(checkModUpdates, 30 * 60 * 1000)
 
   const setTheme = (accent, background, glow) => {
     theme = makeTheme(accent, background, glow)
-    accentInput.value = theme.accent
-    bgInput.value = theme.background
-    glowInput.value = theme.glow
+    paintChips()
     applyTheme(theme)
     writeTheme(theme)
     markActivePreset()
+    if (activeChip) refreshPopover()
   }
 
-  ;[accentInput, bgInput, glowInput].forEach(input => input.addEventListener('input', () => setTheme(
-    isHex(accentInput.value) ? accentInput.value : DEFAULT_THEME.accent,
-    isHex(bgInput.value) ? bgInput.value : DEFAULT_THEME.background,
-    isHex(glowInput.value) ? glowInput.value : DEFAULT_THEME.glow
-  )))
+  const refreshPopover = () => {
+    if (!activeChip) return
+    const current = theme[activeChip.key]
+    if (popoverHex) popoverHex.value = current
+    if (popoverGrid) {
+      popoverGrid.querySelectorAll('.color-popover-swatch').forEach(node => {
+        node.classList.toggle('active', node.dataset.color.toLowerCase() === current.toLowerCase())
+      })
+    }
+  }
+
+  const pick = hex => {
+    if (!activeChip || !isHex(hex)) return
+    setTheme(
+      activeChip.key === 'accent' ? hex : theme.accent,
+      activeChip.key === 'background' ? hex : theme.background,
+      activeChip.key === 'glow' ? hex : theme.glow
+    )
+  }
+
+  const closePopover = () => {
+    if (!popover) return
+    popover.hidden = true
+    activeChip = null
+  }
+
+  if (popoverGrid) {
+    PALETTE.forEach(hex => {
+      const node = document.createElement('button')
+      node.type = 'button'
+      node.className = 'color-popover-swatch'
+      node.dataset.color = hex
+      node.style.setProperty('--swatch', hex)
+      node.setAttribute('aria-label', hex)
+      node.addEventListener('click', () => pick(hex))
+      popoverGrid.append(node)
+    })
+  }
+
+  CHIPS.forEach(({ node, key }) => {
+    node.addEventListener('click', event => {
+      event.stopPropagation()
+      if (!popover) return
+      if (activeChip && activeChip.key === key) { closePopover(); return }
+      activeChip = { node, key }
+      popover.hidden = false
+      refreshPopover()
+    })
+  })
+
+  if (popoverHex) {
+    popoverHex.addEventListener('change', () => pick(popoverHex.value.trim()))
+    popoverHex.addEventListener('keydown', event => {
+      if (event.key === 'Enter') pick(popoverHex.value.trim())
+    })
+  }
+
+  document.addEventListener('click', event => {
+    if (!activeChip) return
+    if (popover && popover.contains(event.target)) return
+    if (CHIPS.some(({ node }) => node === event.target)) return
+    closePopover()
+  })
 
   PRESETS.forEach(preset => {
     const node = document.createElement('button')
@@ -1740,5 +1820,6 @@ setInterval(checkModUpdates, 30 * 60 * 1000)
 
   resetButton.addEventListener('click', () => setTheme(DEFAULT_THEME.accent, DEFAULT_THEME.background, DEFAULT_THEME.glow))
 
+  paintChips()
   markActivePreset()
 })()

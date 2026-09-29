@@ -57,9 +57,10 @@
 
     <main class="main">
       <header class="topbar">
-        <div class="breadcrumbs"><span class="crumb-muted">AOC 2</span><span class="crumb-divider">/</span><span id="current-section">Моды</span></div>
-        <div class="topbar-right">
+        <div class="topbar-left">
           <button class="soft-button nav-back" id="back-to-library" type="button" hidden><span class="nav-back-chevron"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></span><span data-i18n="back">Назад</span></button>
+        </div>
+        <div class="topbar-right">
           <button class="language-picker" id="language-picker" type="button"><img class="language-icon asset-icon" src="assets/icons/language.png" alt="" /><span id="language-current">Русский</span><span class="language-chevron">⌄</span></button>
           <select id="language-select" aria-label="Language" hidden><option value="ru">Русский</option><option value="en">English</option></select>
           <div class="window-controls"><button id="window-minimize" aria-label="Свернуть">−</button><button id="window-close" aria-label="Закрыть">×</button></div>
@@ -146,7 +147,7 @@
 
         <section class="page secondary-page" id="page-settings">
           <div class="eyebrow" data-i18n="settingsEyebrow">ПРИЛОЖЕНИЕ</div><h1 data-i18n="settings">Настройки</h1><p class="page-subtitle" data-i18n="settingsSubtitle">Игровые файлы и оформление приложения.</p>
-          <div class="settings-panel"><h2 data-i18n="gameFolder">Папка игры</h2><p data-i18n="gameFolderDescription">Файлы игры хранятся рядом с лаунчером в папке Games.</p><div class="settings-path" id="settings-games-directory">Games</div><button class="soft-button" id="open-mod-folder-settings"><img class="icon asset-icon" src="assets/icons/folder.png" alt="" /><span data-i18n="openGameFolder">Открыть папку игры</span></button><button class="soft-button launch-log-settings" id="open-launch-log"><img class="icon asset-icon" src="assets/icons/log.png" alt="" /><span data-i18n="openLaunchLog">Журнал запуска</span></button><button class="soft-button launch-log-settings" id="open-last-crash"><img class="icon asset-icon" src="assets/icons/crash.png" alt="" /><span data-i18n="openLastCrash">Лог последнего краша</span></button><div class="settings-divider"></div><h2 data-i18n="customizeLauncher">Настройка лаунчера</h2><p data-i18n="customizeDescription">Логотип, баннер, описание и авторы настраиваются в исходниках приложения.</p><p data-i18n="languageSetting">Язык интерфейса можно переключить в правом верхнем углу.</p><div class="settings-divider"></div><h2 data-i18n="themeTitle">Цвета оформления</h2><p data-i18n="themeDescription">Стандартная тема — как сейчас. Можно выбрать свои цвета: они сохранятся при следующем запуске.</p><div class="theme-editor"><div class="theme-swatches" id="theme-presets"></div><div class="theme-fields"><label class="theme-field"><span data-i18n="themeAccent">Акцент</span><input type="color" id="theme-accent-input" value="#d5d8df" /></label><label class="theme-field"><span data-i18n="themeBackground">Фон</span><input type="color" id="theme-bg-input" value="#1b1b1b" /></label><label class="theme-field theme-field-wide"><span data-i18n="themeGlow">Подсветка</span><input type="color" id="theme-glow-input" value="#54607d" /></label></div><div class="theme-actions"><button class="soft-button" id="theme-reset" type="button" data-i18n="themeReset">Сбросить на стандартную</button></div></div></div>
+          <div class="settings-panel"><h2 data-i18n="gameFolder">Папка игры</h2><p data-i18n="gameFolderDescription">Файлы игры хранятся рядом с лаунчером в папке Games.</p><div class="settings-path" id="settings-games-directory">Games</div><button class="soft-button" id="open-mod-folder-settings"><img class="icon asset-icon" src="assets/icons/folder.png" alt="" /><span data-i18n="openGameFolder">Открыть папку игры</span></button><button class="soft-button launch-log-settings" id="open-launch-log"><img class="icon asset-icon" src="assets/icons/log.png" alt="" /><span data-i18n="openLaunchLog">Журнал запуска</span></button><button class="soft-button launch-log-settings" id="open-last-crash"><img class="icon asset-icon" src="assets/icons/warning.png" alt="" /><span data-i18n="openLastCrash">Лог последнего краша</span></button><div class="settings-divider"></div><h2 data-i18n="customizeLauncher">Настройка лаунчера</h2><p data-i18n="customizeDescription">Логотип, баннер, описание и авторы настраиваются в исходниках приложения.</p><p data-i18n="languageSetting">Язык интерфейса можно переключить в правом верхнем углу.</p><div class="settings-divider"></div><h2 data-i18n="themeTitle">Цвета оформления</h2><p data-i18n="themeDescription">Стандартная тема — как сейчас. Можно выбрать свои цвета: они сохранятся при следующем запуске.</p><div class="theme-editor"><div class="theme-swatches" id="theme-presets"></div><div class="theme-fields"><label class="theme-field"><span data-i18n="themeAccent">Акцент</span><button class="theme-color-chip" id="theme-accent-input" type="button" data-theme-color="accent" aria-label="Акцент"></button></label><label class="theme-field"><span data-i18n="themeBackground">Фон</span><button class="theme-color-chip" id="theme-bg-input" type="button" data-theme-color="background" aria-label="Фон"></button></label><label class="theme-field theme-field-wide"><span data-i18n="themeGlow">Подсветка</span><button class="theme-color-chip" id="theme-glow-input" type="button" data-theme-color="glow" aria-label="Подсветка"></button></label></div><div class="theme-actions"><button class="soft-button" id="theme-reset" type="button" data-i18n="themeReset">Сбросить на стандартную</button></div></div><div class="color-popover" id="color-popover" hidden><div class="color-popover-grid" id="color-popover-grid"></div><div class="color-popover-hex"><span data-i18n="themeHex">HEX</span><input id="color-popover-hex-input" type="text" maxlength="7" spellcheck="false" /></div></div></div>
         </section>
       </div>
       <div class="toast" id="toast" role="status"></div>
@@ -161,19 +162,13 @@
       <p data-i18n="javaRequiredDescription">Для запуска AoH2MP нужна Java 17 или новее. Откроем официальную страницу загрузки Java.</p>
       <div class="java-dialog-actions"><button class="button-primary" id="download-java" data-i18n="downloadJava">Скачать Java 17</button><button class="soft-button" id="check-java" data-i18n="checkJava">Проверить снова</button><button class="soft-button" id="cancel-java" data-i18n="later">Позже</button></div>
     </dialog>
-    <dialog class="update-dialog" id="update-dialog">
-      <span class="eyebrow">ОБНОВЛЕНИЕ ЛАУНЧЕРА</span>
-      <h2 data-i18n="updateTitle">Обновление готово</h2>
-      <p data-i18n="updateDescription">Новая версия уже скачана. Перезапусти лаунчер, чтобы установить её.</p>
-      <div class="update-dialog-actions"><button class="button-primary" id="install-update" data-i18n="updateInstall">Перезапустить и обновить</button><button class="soft-button" id="later-update" data-i18n="updateLater">Позже</button></div>
-    </dialog>
     <dialog class="language-dialog" id="language-dialog">
       <button class="dialog-close" id="close-language-dialog" aria-label="Закрыть">×</button>
       <span class="eyebrow" data-i18n="languagePickerEyebrow">ИНТЕРФЕЙС</span>
       <h2 data-i18n="languagePickerTitle">Выбери язык</h2>
       <div class="language-options">
-        <button class="language-option" data-language="ru"><span class="language-option-flag">RU</span><span><b>Русский</b><small>Russian</small></span><span class="language-option-check"></span></button>
-        <button class="language-option" data-language="en"><span class="language-option-flag">EN</span><span><b>English</b><small>Английский</small></span><span class="language-option-check"></span></button>
+<button class="language-option" data-language="ru"><span class="language-option-flag"><img src="assets/flags/ru.svg" alt="" /></span><span><b>Русский</b><small>Russian</small></span><span class="language-option-check"></span></button>
+<button class="language-option" data-language="en"><span class="language-option-flag"><img src="assets/flags/en.svg" alt="" /></span><span><b>English</b><small>Английский</small></span><span class="language-option-check"></span></button>
       </div>
     </dialog>
     <dialog class="confirm-dialog" id="confirm-dialog">

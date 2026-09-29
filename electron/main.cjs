@@ -6,7 +6,6 @@ const path = require('node:path')
 const os = require('node:os')
 const { pipeline } = require('node:stream/promises')
 const yauzl = require('yauzl')
-const { autoUpdater } = require('electron-updater')
 const launcherConfig = require('../app/launcher-config.json')
 const JAVA_DOWNLOAD_URL = 'https://adoptium.net/temurin/releases/?version=17'
 const TELEGRAM_SUPPORT_URL = 'https://t.me/communityAOC2mp/2682'
@@ -36,9 +35,6 @@ const skippedDirectoryNames = new Set([
   '.git',
   '.svn'
 ])
-
-autoUpdater.autoDownload = true
-autoUpdater.autoInstallOnAppQuit = true
 
 // --- Simple repo-based updater (reads version file committed in this repository) ---
 const https = require('node:https')
@@ -121,31 +117,12 @@ async function applyRepoUpdate() {
   await downloadFile(RAW_BASE + 'AOC-2-Multiplayer-Setup.exe', dest)
   const launchError = await shell.openPath(dest)
   if (launchError) throw new Error(launchError)
+  // The installer cannot overwrite a running executable, so step aside and let it take over.
+  setTimeout(() => app.quit(), 1200)
   return { started: true, version: latest }
 }
 
 // --- end repo-based updater ---
-
-function reportLauncherUpdate(status) {
-  for (const window of BrowserWindow.getAllWindows()) {
-    if (!window.isDestroyed()) window.webContents.send('launcher:update-status', status)
-  }
-}
-
-autoUpdater.on('checking-for-update', () => reportLauncherUpdate({ phase: 'checking' }))
-autoUpdater.on('update-available', info => reportLauncherUpdate({ phase: 'available', version: info.version }))
-autoUpdater.on('update-not-available', info => reportLauncherUpdate({ phase: 'current', version: info.version }))
-autoUpdater.on('download-progress', progress => reportLauncherUpdate({
-  phase: 'downloading',
-  percent: Math.round(progress.percent),
-  transferred: progress.transferred,
-  total: progress.total
-}))
-autoUpdater.on('update-downloaded', info => reportLauncherUpdate({ phase: 'downloaded', version: info.version }))
-autoUpdater.on('error', error => {
-  console.error('Launcher update failed:', error)
-  reportLauncherUpdate({ phase: 'error', message: error.message })
-})
 
 // --- GitHub API helpers (mod update checks, commit history) ---
 const repositoryHeads = new Map()
@@ -462,11 +439,25 @@ async function finishGameSession(versionId, sessionId, error) {
   if (session.closeWhenFinished && BrowserWindow.getAllWindows().length === 0) app.quit()
 }
 
+function isSingleplayerVersion(version) {
+  return version.kind === 'singleplayer'
+}
+
 function getVersion(versionId) {
   const version = launcherConfig.versions.find(item => item.id === versionId)
   if (!version) throw new Error('Неизвестная версия мода.')
   if (!/^[a-z0-9][a-z0-9.-]*$/i.test(version.id)) {
     throw new Error('Некорректный идентификатор версии в launcher-config.json.')
+  }
+  // Singleplayer entries ship with another version's files, so they have no repository of their own.
+  if (isSingleplayerVersion(version)) {
+    if (!launcherConfig.versions.some(item => item.id === version.requires)) {
+      throw new Error(`Версия ${version.id} требует несуществующую версию ${version.requires}.`)
+    }
+    if (!version.entryPoint) {
+      throw new Error(`Для версии ${version.id} не указан entryPoint в launcher-config.json.`)
+    }
+    return version
   }
   if (!/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/i.test(version.repository)) {
     throw new Error('Некорректный репозиторий версии в launcher-config.json.')
@@ -504,7 +495,8 @@ async function ensureVersionsDirectory() {
 }
 
 function getVersionDirectory(versionId) {
-  const id = getVersion(versionId).id
+  const version = getVersion(versionId)
+  const id = isSingleplayerVersion(version) ? version.requires : version.id
   return gameLocations[id] || path.join(getVersionsDirectory(), id)
 }
 
@@ -608,8 +600,14 @@ async function discoverExistingGameDirectory(versionId) {
 }
 
 function isInstalled(versionId) {
+  const version = getVersion(versionId)
+  const directory = getVersionDirectory(versionId)
+  if (isSingleplayerVersion(version)) {
+    if (!isInstalled(version.requires)) return false
+    return fs.existsSync(path.join(directory, version.entryPoint))
+  }
   try {
-    return fs.statSync(path.join(getVersionDirectory(versionId), 'AoH2MP.jar')).isFile()
+    return fs.statSync(path.join(directory, 'AoH2MP.jar')).isFile()
   } catch (error) {
     if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return false
     throw error
@@ -884,20 +882,6 @@ ipcMain.handle('launcher:open-last-crash', async () => {
 ipcMain.handle('launcher:download-java', async () => {
   await shell.openExternal(JAVA_DOWNLOAD_URL)
   return { opened: true }
-})
-ipcMain.handle('launcher:check-updates', async () => {
-  if (!app.isPackaged) return { supported: false, version: app.getVersion() }
-  try {
-    await autoUpdater.checkForUpdates()
-    return { supported: true, version: app.getVersion() }
-  } catch (error) {
-    console.error('Could not check for launcher updates:', error)
-    reportLauncherUpdate({ phase: 'error', message: error.message })
-    return { supported: true, version: app.getVersion(), error: error.message }
-  }
-})
-ipcMain.handle('launcher:install-update', () => {
-  autoUpdater.quitAndInstall()
 })
 ipcMain.handle('launcher:check-repo-update', () => checkRepoUpdate())
 ipcMain.handle('launcher:apply-repo-update', () => applyRepoUpdate())
@@ -1236,6 +1220,68 @@ ipcMain.handle('mod:launch', async (_event, versionId) => {
   const java = getJavaExecutable()
   if (!java) return { started: false, javaMissing: true }
 
+  // Singleplayer entries run their own executable out of the host version folder.
+  if (isSingleplayerVersion(version)) {
+    const entryPath = path.join(modDirectory, version.entryPoint)
+    if (!fs.existsSync(entryPath)) {
+      throw new Error('Файл ' + version.entryPoint + ' не найден. Переустановите Bloody Europe 1.9.3.')
+    }
+    const entryLogDirectory = path.join(app.getPath('userData'), 'logs')
+    const entryLogPath = path.join(entryLogDirectory, version.id + '-latest.log')
+    await fsp.mkdir(entryLogDirectory, { recursive: true })
+    await fsp.writeFile(entryLogPath, [
+      'Launch time: ' + new Date().toISOString(),
+      'Working directory: ' + modDirectory,
+      'Entry point: ' + entryPath,
+      ''
+    ].join('\r\n'))
+
+    const entrySessionId = version.id + ':' + Date.now()
+    const entryStartedAt = Date.now()
+    const entryRecord = gameStats.versions[version.id] || { playSeconds: 0, sessions: 0 }
+    entryRecord.lastPlayed = new Date(entryStartedAt).toISOString()
+    entryRecord.activeSince = entryStartedAt
+    try { entryRecord.installedAt = fs.statSync(entryPath).birthtime.toISOString() } catch (error) { void error }
+    gameStats.versions[version.id] = entryRecord
+    const entryLog = fs.openSync(entryLogPath, 'a')
+    let entryChild
+    try {
+      entryChild = spawn(entryPath, [], {
+        cwd: modDirectory,
+        detached: true,
+        stdio: ['ignore', entryLog, entryLog],
+        windowsHide: false
+      })
+    } catch (error) {
+      fs.closeSync(entryLog)
+      throw new Error('Не удалось запустить ' + version.entryPoint + ': ' + error.message, { cause: error })
+    }
+    fs.closeSync(entryLog)
+    await new Promise((resolve, reject) => {
+      entryChild.once('error', reject)
+      entryChild.once('spawn', resolve)
+    })
+    activeGames.set(entrySessionId, {
+      versionId: version.id,
+      startedAt: entryStartedAt,
+      lastCheckpointAt: entryStartedAt,
+      closeWhenFinished: false,
+      child: entryChild
+    })
+    entryChild.once('error', error => {
+      finishGameSession(version.id, entrySessionId, error).catch(() => {})
+    })
+    entryChild.once('exit', (code, signal) => {
+      const detail = '\r\nProcess exit: code=' + code + ', signal=' + (signal || 'none') + '\r\n'
+      fsp.appendFile(entryLogPath, detail).catch(() => {})
+      finishGameSession(version.id, entrySessionId, null).catch(() => {})
+    })
+    entryChild.unref()
+    await persistGameStats()
+    reportStatusChange()
+    return { started: true, entryPoint: version.entryPoint }
+  }
+
   const logDirectory = path.join(app.getPath('userData'), 'logs')
   const logPath = path.join(logDirectory, `${version.id}-latest.log`)
   await fsp.mkdir(logDirectory, { recursive: true })
@@ -1335,13 +1381,8 @@ function applyRendererPolicies(window) {
     if (params.isEditable) return
     event.preventDefault()
   })
-  window.webContents.on('before-input-event', (event, input) => {
-    const active = window.webContents.getFocusedFrame()?.document?.activeElement || null
-    const isTextField = Boolean(active && active.matches && active.matches('input, textarea, [contenteditable="true"]'))
-    if (input.control && ['a', 'c'].includes(input.key.toLowerCase()) && !isTextField) {
-      event.preventDefault()
-    }
-  })
+  // Ctrl+A / Ctrl+C outside text fields is handled in the renderer: WebFrameMain has no
+  // access to document.activeElement, so the main process cannot answer that question.
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https://')) shell.openExternal(url)
     return { action: 'deny' }

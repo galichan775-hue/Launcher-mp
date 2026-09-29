@@ -1,6 +1,6 @@
 {
   "name": "aoc-2-multiplayer",
-  "version": "1.2.3",
+  "version": "1.2.6",
   "private": true,
   "description": "Age of History II multiplayer mod launcher",
   "author": "AOC 2 Multiplayer",
@@ -15,20 +15,11 @@
     "electron-builder": "^26.15.3"
   },
   "dependencies": {
-    "electron-updater": "^6.8.9",
     "yauzl": "^3.4.0"
   },
   "build": {
     "appId": "ru.aoc2.multiplayer",
     "productName": "AOC 2 Multiplayer",
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "galichan775-hue",
-        "repo": "Launcher-mp",
-        "releaseType": "release"
-      }
-    ],
     "asar": true,
     "files": [
       "app/**/*",

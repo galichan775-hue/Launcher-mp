@@ -6,8 +6,6 @@ contextBridge.exposeInMainWorld('aocLauncher', Object.freeze({
   getGameStats: versionId => ipcRenderer.invoke('game:get-stats', versionId),
   getJava: () => ipcRenderer.invoke('launcher:get-java'),
   downloadJava: () => ipcRenderer.invoke('launcher:download-java'),
-  checkForUpdates: () => ipcRenderer.invoke('launcher:check-updates'),
-  installUpdate: () => ipcRenderer.invoke('launcher:install-update'),
   checkRepoUpdate: () => ipcRenderer.invoke('launcher:check-repo-update'),
   applyRepoUpdate: () => ipcRenderer.invoke('launcher:apply-repo-update'),
   minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
@@ -44,10 +42,5 @@ contextBridge.exposeInMainWorld('aocLauncher', Object.freeze({
     const listener = () => callback()
     ipcRenderer.on('mod:status-changed', listener)
     return () => ipcRenderer.removeListener('mod:status-changed', listener)
-  },
-  onUpdateStatus: callback => {
-    const listener = (_event, result) => callback(result)
-    ipcRenderer.on('launcher:update-status', listener)
-    return () => ipcRenderer.removeListener('launcher:update-status', listener)
   }
 }))

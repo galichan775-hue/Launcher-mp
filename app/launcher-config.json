@@ -35,10 +35,10 @@
       "id": "bloody-europe-1.9.3",
       "version": "1.9.3",
       "name": "Bloody Europe 1.9.3",
-      "tagline": "Мультиплеерный мод для Age of History II",
-      "taglineEn": "A multiplayer mod for Age of History II",
-      "description": "AoH2MP — мультиплеер для Age of History 2\n\nСоздаёшь комнату (или подключаешься к чужой) — и вот вы уже вдвоём, втроём или больше управляете разными странами на одной и той же карте одновременно.\n\nПодключиться можно через Steam (если игра куплена там — находишь друзей и заходишь к ним в комнату) или просто по локальной сети, если вы рядом на одном Wi-Fi.\n\nЕсть встроенный чат, чтобы договариваться о союзах или объявлять войну прямо в игре",
-      "descriptionEn": "AoH2MP — multiplayer for Age of History 2\n\nCreate a room (or join someone else's) and play together, each controlling different countries on the same map.\n\nConnect through Steam (if you own the game there, find your friends and join their room) or over a local network when you are on the same Wi-Fi.\n\nAn in-game chat lets you negotiate alliances or declare war while you play.",
+      "tagline": "Мод для Age of History II с мультиплеером 1.9.3",
+      "taglineEn": "Age of History II mod with the 1.9.3 multiplayer mod",
+      "description": "Bloody Europe 1.9.3 — мод для Age of History II, в который добавлен мультиплеерный мод AoH2MP 1.9.3.\n\nЭто полноценная версия Bloody Europe со всеми странами, картами и ресурсами мода, к которой прилагается мультиплеер. Создавайте комнаты, подключайтесь к чужим и играйте вместе на одной карте.\n\nПодключение работает через Steam, если игра куплена там, или по локальной сети, когда вы в одной сети Wi-Fi. Встроенный чат помогает договориться о союзах прямо во время матча.",
+      "descriptionEn": "Bloody Europe 1.9.3 — a mod for Age of History II with the AoH2MP 1.9.3 multiplayer mod added.\n\nYou get the full Bloody Europe mod with all of its nations, maps and resources, plus multiplayer on top. Create rooms, join someone else's and play together on the same map.\n\nConnect through Steam when you own the game there, or over a local network when you are on the same Wi-Fi. The in-game chat lets you negotiate alliances while the match is running.",
       "creator": {
         "name": "kkun3756",
         "url": "https://t.me/kkun3756"
@@ -55,13 +55,33 @@
       }
     },
     {
+      "id": "bloody-europe",
+      "version": "1.9.3",
+      "name": "Bloody Europe",
+      "tagline": "Одиночная версия Bloody Europe",
+      "taglineEn": "Singleplayer Bloody Europe",
+      "description": "Bloody Europe — одиночная версия без мультиплеера.\n\nОна устанавливается вместе с файлами Bloody Europe 1.9.3 и запускается отдельным пунктом: полная одиночная игра Age of History II со странами и картами Bloody Europe.\n\nЭта версия появляется только после установки Bloody Europe 1.9.3.",
+      "descriptionEn": "Bloody Europe — the singleplayer version, without multiplayer.\n\nIt ships together with the Bloody Europe 1.9.3 files and is launched as its own entry: the full singleplayer Age of History II experience with the Bloody Europe nations and maps.\n\nThis version only appears once Bloody Europe 1.9.3 is installed.",
+      "creator": {
+        "name": "kkun3756",
+        "url": "https://t.me/kkun3756"
+      },
+      "kind": "singleplayer",
+      "requires": "bloody-europe-1.9.3",
+      "entryPoint": "BEII.exe",
+      "banner": "assets/versions/bloody-europe/banner.webp",
+      "icon": "assets/branding/logo.svg",
+      "screenshots": [],
+      "changes": { "added": [], "changed": [], "removed": [] }
+    },
+    {
       "id": "aoh2mp-1.9.3",
       "version": "1.9.3",
       "name": "AoH2MP 1.9.3",
-      "tagline": "Отдельная версия AoH2MP",
-      "taglineEn": "Standalone AoH2MP version",
-      "description": "AoH2MP 1.9.3\n\nОписание версии можно изменить в app/launcher-config.json.",
-      "descriptionEn": "AoH2MP 1.9.3\n\nEdit this version description in app/launcher-config.json.",
+      "tagline": "Age of History II с мультиплеером",
+      "taglineEn": "Age of History II with multiplayer",
+      "description": "AoH2MP 1.9.3 — Age of History II с мультиплеером.\n\nСоздайте комнату или подключитесь к чужой, и вы вместе управляете разными странами на одной и той же карте.\n\nИграйте через Steam или по локальной сети, а встроенный чат поможет договориться о союзах прямо в матче.",
+      "descriptionEn": "AoH2MP 1.9.3 — Age of History II with multiplayer.\n\nCreate a room or join someone else's, and you control different nations on the very same map together.\n\nPlay through Steam or over a local network, and use the in-game chat to sort out alliances while you play.",
       "creator": {
         "name": "kkun3756",
         "url": "https://t.me/kkun3756"
@@ -77,10 +97,10 @@
       "id": "aoh2mp-1.9.4",
       "version": "1.9.4",
       "name": "AoH2MP 1.9.4",
-      "tagline": "Отдельная версия AoH2MP",
-      "taglineEn": "Standalone AoH2MP version",
-      "description": "AoH2MP 1.9.4\n\nОписание версии можно изменить в app/launcher-config.json.",
-      "descriptionEn": "AoH2MP 1.9.4\n\nEdit this version description in app/launcher-config.json.",
+      "tagline": "Age of History II с мультиплеером и новыми функциями",
+      "taglineEn": "Age of History II with multiplayer and new features",
+      "description": "AoH2MP 1.9.4 — Age of History II с мультиплеером и новыми функциями.\n\nКроме обычного мультиплеера появились автоход и автопостройка: они берут на себя рутинные действия и оставляют больше времени на стратегию.\n\nСоздайте комнату или подключитесь к чужой, чтобы играть на одной карте вместе. Подключение работает через Steam и по локальной сети, а встроенный чат помогает обсуждать союзы прямо во время матча.",
+      "descriptionEn": "AoH2MP 1.9.4 — Age of History II with multiplayer and new features.\n\nOn top of regular multiplayer it introduces auto-move and auto-build, which take the repetitive work off your hands and leave more time for strategy.\n\nCreate a room or join someone else's to play together on one map. Connect through Steam or over a local network, and use the in-game chat to discuss alliances while the match is running.",
       "creator": {
         "name": "kkun3756",
         "url": "https://t.me/kkun3756"
