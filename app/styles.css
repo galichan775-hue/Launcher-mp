@@ -356,11 +356,13 @@ a.community-link:hover { border-color: #6d7177; background: #303236; color: whit
 }
 .status-dot { box-shadow: 0 0 12px #d8e0f166; }
 .topbar { background: linear-gradient(180deg,#1c1e242e,#1c1e2400); }
-/* Language control: a compact three-dot ("more") button, as supplied. */
-.language-picker { display: inline-flex; align-items: center; justify-content: center; gap: 0; width: 32px; min-width: 32px; height: 32px; padding: 0; border: 1px solid #ffffff20; border-radius: 9px; background: linear-gradient(140deg,#30333b,#24262c); color: #d9dce3; cursor: pointer; transition: border-color .15s,background .15s,transform .15s; }
+/* Language control: globe + current language + the supplied three dots that open the list. */
+.language-picker { display: inline-flex; align-items: center; gap: 8px; min-width: 132px; height: 32px; padding: 0 10px 0 11px; border: 1px solid #ffffff20; border-radius: 9px; background: linear-gradient(140deg,#30333b,#24262c); color: #d9dce3; font-size: 11px; font-family: inherit; cursor: pointer; transition: border-color .15s,background .15s,transform .15s; }
 .language-picker:hover { transform: translateY(-1px); border-color: #c0cbe03d; background: linear-gradient(140deg,#3b3e48,#292b32); }
-.language-picker .language-icon { width: 18px; height: 18px; --icon-color: #d9dde5; }
-.language-picker #language-current { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.language-picker .language-icon { flex: none; width: 15px; height: 15px; --icon-color: #b7bdc8; }
+.language-picker #language-current { flex: 1; text-align: left; white-space: nowrap; }
+.language-dots { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 14px; height: 14px; }
+.language-dots img, .language-dots .themed-icon { width: 14px; height: 14px; --icon-color: #959baa; }
 .language-icon { width: 14px; height: 14px; }
 .page.active { animation: page-arrive .22s ease-out both; }
 @keyframes page-arrive { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
