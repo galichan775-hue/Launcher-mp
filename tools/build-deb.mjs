@@ -280,18 +280,34 @@ async function writeTar(entries, target) {
 
 // ---------------------------------------------------------------- ar writer
 
+// A .deb is a plain ar archive. Every field is ASCII, left aligned and padded with spaces, and
+// the file must start with the "!<arch>\n" magic or apt rejects the whole package. Node's
+// Buffer.write zero-pads a short string, which is exactly how a NUL sneaks into the mode field,
+// so the padding is built here instead.
+const AR_MAGIC = Buffer.from('!<arch>\n', 'ascii')
+
 function buildAr(members) {
-  const chunks = []
+  const chunks = [AR_MAGIC]
+  const fields = [
+    [16, member => member.name],
+    [12, member => String(member.mtime)],
+    [6, () => '0'],
+    [6, () => '0'],
+    [8, () => '100644'],
+    [10, member => String(member.data.length)]
+  ]
   for (const member of members) {
-    const header = Buffer.alloc(60)
-    // GNU ar space-pads the name field, which is what dpkg's ar reader expects
-    header.write(member.name.padEnd(16, ' ').slice(0, 16), 0, 16, 'ascii')
-    header.write(String(member.mtime).padStart(12, ' '), 16, 12, 'ascii')
-    header.write('0     ', 28, 6, 'ascii')
-    header.write('0     ', 34, 6, 'ascii')
-    header.write('100644 ', 40, 8, 'ascii')
-    header.write(String(member.data.length).padStart(10, ' '), 48, 10, 'ascii')
-    header.write('`\n', 58, 2, 'ascii')
+    const header = Buffer.alloc(60, 0x20)
+    let offset = 0
+    for (const [width, read] of fields) {
+      const value = read(member)
+      if (value.length > width) throw new Error(`ar field "${value}" does not fit in ${width} bytes`)
+      header.write(value, offset, 'ascii')
+      offset += width
+    }
+    header[58] = 0x60 // '`'
+    header[59] = 0x0a
+    if (header.includes(0)) throw new Error('ar header contains a NUL byte')
     chunks.push(header, member.data)
     if (member.data.length % 2) chunks.push(Buffer.from('\n'))
   }

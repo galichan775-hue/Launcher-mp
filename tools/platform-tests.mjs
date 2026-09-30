@@ -66,7 +66,7 @@ for (const bad of ['', 'not a version', 'abc.def', 'version ""']) {
 }
 
 process.stdout.write('\nversion gating\n')
-const windowsOnly = { id: 'sp', entryPoint: 'BEII.exe', platforms: ['win32'] }
+const windowsOnly = { id: 'sp', entryPoint: 'some-windows-only.jar', platforms: ['win32'] }
 const anyPlatform = { id: 'mp', entryPoint: 'game.jar' }
 const linuxList = { id: 'x', platforms: ['linux'] }
 eq('a version without platforms is allowed', platform.isVersionSupported(anyPlatform), true)

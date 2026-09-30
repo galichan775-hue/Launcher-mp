@@ -1192,24 +1192,30 @@ ipcMain.handle('mod:launch', async (_event, versionId) => {
   }
 
   const modDirectory = getVersionDirectory(version.id)
-  const jarPath = path.join(modDirectory, 'AoH2MP.jar')
-  if (!fs.existsSync(jarPath)) throw new Error('Файл AoH2MP.jar не найден в папке игры. Переустановите версию.')
+  // Singleplayer lives in the host version's folder but runs its own jar, so it must not require
+  // the multiplayer one to be present.
+  const singleplayer = isSingleplayerVersion(version)
+  const jarName = singleplayer ? version.entryPoint : 'AoH2MP.jar'
+  const jarPath = path.join(modDirectory, jarName)
+  if (!fs.existsSync(jarPath)) {
+    throw new Error('Файл ' + jarName + ' не найден. Переустановите '
+      + (singleplayer ? 'Bloody Europe 1.9.3.' : 'версию.'))
+  }
   const java = getJavaExecutable()
   if (!java) return { started: false, javaMissing: true }
 
-  // Singleplayer entries run their own executable out of the host version folder.
-  if (isSingleplayerVersion(version)) {
-    const entryPath = path.join(modDirectory, version.entryPoint)
-    if (!fs.existsSync(entryPath)) {
-      throw new Error('Файл ' + version.entryPoint + ' не найден. Переустановите Bloody Europe 1.9.3.')
-    }
+  // Singleplayer entries ship with another version's files, so only the jar differs from the
+  // multiplayer path below; the launch itself is the same java -jar call.
+  if (singleplayer) {
+    const entryPath = jarPath
     const entryLogDirectory = path.join(app.getPath('userData'), 'logs')
     const entryLogPath = path.join(entryLogDirectory, version.id + '-latest.log')
     await fsp.mkdir(entryLogDirectory, { recursive: true })
     await fsp.writeFile(entryLogPath, [
       'Launch time: ' + new Date().toISOString(),
+      `Java: ${java.executable} (${java.version})`,
       'Working directory: ' + modDirectory,
-      'Entry point: ' + entryPath,
+      'JAR: ' + entryPath,
       ''
     ].join('\r\n'))
 
@@ -1223,7 +1229,7 @@ ipcMain.handle('mod:launch', async (_event, versionId) => {
     const entryLog = fs.openSync(entryLogPath, 'a')
     let entryChild
     try {
-      entryChild = spawn(entryPath, [], {
+      entryChild = spawn(java.executable, ['-jar', entryPath], {
         cwd: modDirectory,
         detached: true,
         stdio: ['ignore', entryLog, entryLog],
@@ -1231,11 +1237,14 @@ ipcMain.handle('mod:launch', async (_event, versionId) => {
       })
     } catch (error) {
       fs.closeSync(entryLog)
-      throw new Error('Не удалось запустить ' + version.entryPoint + ': ' + error.message, { cause: error })
+      throw new Error('Не удалось запустить Java (' + java.executable + '): ' + error.message, { cause: error })
     }
     fs.closeSync(entryLog)
     await new Promise((resolve, reject) => {
-      entryChild.once('error', reject)
+      entryChild.once('error', error => reject(new Error(
+        'Не удалось запустить Java (' + java.executable + '): ' + error.message,
+        { cause: error }
+      )))
       entryChild.once('spawn', resolve)
     })
     activeGames.set(entrySessionId, {

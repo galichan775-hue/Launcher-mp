@@ -32,18 +32,52 @@ const check = (label, ok, detail = '') => {
 
 // ---------------------------------------------------------------- ar parsing
 
+const AR_MAGIC = '!<arch>\n'
+const AR_FIELDS = [
+  ['name', 0, 16],
+  ['mtime', 16, 12],
+  ['uid', 28, 6],
+  ['gid', 34, 6],
+  ['mode', 40, 8],
+  ['size', 48, 10]
+]
+
 function parseAr(buffer) {
+  // Without this magic apt reports "invalid archive signature" and then cannot find control.tar,
+  // so it has to be asserted instead of assumed.
+  if (buffer.length < 8 || buffer.toString('latin1', 0, 8) !== AR_MAGIC) {
+    throw new Error(`ar archive must start with ${JSON.stringify(AR_MAGIC)}, found ${JSON.stringify(buffer.toString('latin1', 0, 8))}`)
+  }
   const members = []
-  let offset = 0
+  let offset = 8
   while (offset + 60 <= buffer.length) {
     const header = buffer.subarray(offset, offset + 60)
-    const name = header.subarray(0, 16).toString('ascii').replace(/[\s\0]+$/, '').replace(/\/$/, '')
-    const size = Number(header.subarray(48, 58).toString('ascii').trim())
-    const magic = header.subarray(58, 60).toString('ascii')
+    const field = {}
+    for (const [label, start, width] of AR_FIELDS) {
+      const value = header.toString('latin1', start, start + width)
+      // dpkg pads every field with spaces. Buffer.write zero-pads a value that is shorter than the
+      // field width, and a NUL there is exactly what makes a package unreadable.
+      if (!/^[\x20-\x7e]+$/.test(value)) {
+        throw new Error(`ar ${label} field of member ${members.length + 1} is not printable ASCII: ${JSON.stringify(value)}`)
+      }
+      field[label] = value.trim()
+    }
+    const name = field.name.replace(/\/$/, '')
+    const magic = header.toString('latin1', 58, 60)
     if (magic !== '`\n') throw new Error(`bad ar magic after member ${name}: ${JSON.stringify(magic)}`)
+    const size = Number.parseInt(field.size, 10)
+    if (!Number.isSafeInteger(size) || size < 0) {
+      throw new Error(`bad ar size for ${name}: ${JSON.stringify(field.size)}`)
+    }
     const start = offset + 60
+    if (start + size > buffer.length) {
+      throw new Error(`ar member ${name} claims ${size} bytes but the archive ends first`)
+    }
     members.push({ name, size, data: buffer.subarray(start, start + size) })
     offset = start + size + (size % 2)
+  }
+  if (offset !== buffer.length) {
+    throw new Error(`ar archive has ${buffer.length - offset} unexpected trailing bytes`)
   }
   return members
 }
@@ -115,6 +149,27 @@ async function main() {
   check('control member present', Boolean(controlMember), controlMember?.name)
   check('data member present', Boolean(dataMember), dataMember?.name)
   check('members use a compression dpkg understands', ['.gz', '.xz'].includes(controlMember?.name.slice(-3)), controlMember?.name.slice(-3))
+
+  // Our own parseAr was originally written to match our own writer, so a container we mis-assembled
+  // passed verification and apt refused to install it. libarchive is an independent reader, which is
+  // exactly the oracle that was missing.
+  let oracle = null
+  for (const candidate of ['tar', 'bsdtar']) {
+    const probe = spawnSync(candidate, ['-tf', DEB], { encoding: 'utf8' })
+    if (probe.error) continue
+    if (probe.status !== 0) {
+      check(`libarchive (${candidate}) can read the ar container`, false, (probe.stderr || '').trim())
+      throw new Error('an independent ar reader rejects the package, apt would refuse it too')
+    }
+    oracle = { tool: candidate, names: probe.stdout.split(/\r?\n/).filter(Boolean) }
+    break
+  }
+  if (oracle) {
+    check(`libarchive (${oracle.tool}) reads the ar container`, true, oracle.names.join(', '))
+    check('libarchive sees the same three members', oracle.names.join(', ') === members.map(member => member.name).join(', '), oracle.names.join(', '))
+  } else {
+    process.stdout.write('  NOTE: no tar or bsdtar on this machine, skipped the independent ar reader check\n')
+  }
 
   process.stdout.write('\nxz members decode\n')
   const controlTar = controlMember.name.endsWith('.xz')
@@ -271,7 +326,11 @@ async function main() {
   check('preload exposes revealFile to the renderer', /revealFile:\s*\(?\s*filePath\s*\)?\s*=>/.test(preload))
   const launcherConfig = JSON.parse(asar.extractFile(asarTarget, 'app/launcher-config.json').toString('utf8'))
   const windowsOnly = launcherConfig.versions.filter(version => Array.isArray(version.platforms) && !version.platforms.includes('linux'))
-  check('singleplayer entry is marked win32 only', windowsOnly.length === 1 && windowsOnly[0].entryPoint === 'BEII.exe', windowsOnly.map(v => v.entryPoint).join(', '))
+  check('the shipped config gates no version on Windows only', windowsOnly.length === 0, windowsOnly.map(v => v.entryPoint).join(', '))
+  const singleplayerEntry = launcherConfig.versions.find(version => version.id === 'bloody-europe')
+  check('singleplayer launches its jar, not the windows exe', singleplayerEntry?.entryPoint === 'BE2.jar', String(singleplayerEntry?.entryPoint))
+  const main = asar.extractFile(asarTarget, 'electron/main.cjs').toString('utf8')
+  check('every launch goes through java -jar', !/spawn\(entryPath, \[\]/.test(main) && /spawn\(java\.executable, \['-jar', entryPath\]/.test(main))
   const renderer = asar.extractFile(asarTarget, 'app/renderer.js').toString('utf8')
   check('renderer knows the manual .deb install flow', /startupUpdateManualText/.test(renderer) && /result\.installCommand/.test(renderer))
   check('renderer renders the platform badge', /platform-badge/.test(renderer))

@@ -41,7 +41,7 @@ The package installs the launcher to `/opt/aoc-2-multiplayer` with a `/usr/bin/a
 
 A `.deb` cannot be installed without root, so the in-app updater does not launch an installer on Linux. It downloads the package, shows `sudo apt install ./AOC-2-Multiplayer-linux-x64.deb` and offers a button to open the download folder.
 
-`BEII.exe` is a Windows executable and is marked `platforms: ["win32"]` in `app\launcher-config.json`. On Linux the launcher draws a "Windows only" badge on that version, explains it on hover and refuses to start it.
+Every version, including the Bloody Europe singleplayer entry, is a Java game and is launched as `java -jar <jar>` with the version folder as the working directory. The singleplayer entry used to run `BEII.exe`, a launch4j wrapper that only exists on Windows; it now runs `BE2.jar`, which ships the LWJGL, libGDX, OpenAL and Steamworks natives for Windows, Linux and macOS, so the version is not platform gated. A version can still be restricted with `platforms: ["win32"]` in `app\launcher-config.json`, in which case the launcher draws a "Windows only" badge, explains it on hover and refuses to start it.
 
 Launcher updates are checked from GitHub Releases in `galichan775-hue/Launcher-mp`. To publish a release, set a newer version in `package.json`, build with `npm run dist`, commit the installer, and create a published GitHub Release with the matching `v<version>` tag.
 

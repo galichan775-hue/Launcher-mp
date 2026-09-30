@@ -111,9 +111,10 @@ check('config exposes the platform label', config.platform?.label === 'Windows',
 check('config advertises the Windows updater artifact', config.platform?.updaterArtifact === 'AOC-2-Multiplayer-Setup.exe', String(config.platform?.updaterArtifact))
 check('config reports self-install support on Windows', config.platform?.updaterCanSelfInstall === true, String(config.platform?.updaterCanSelfInstall))
 check('config still carries the versions', Array.isArray(config.versions) && config.versions.length > 0, `${config.versions?.length} versions`)
-const singleplayer = (config.versions || []).find(version => version.entryPoint === 'BEII.exe')
+const singleplayer = (config.versions || []).find(version => version.entryPoint === 'BE2.jar')
 check('the singleplayer entry is present', Boolean(singleplayer))
-check('the singleplayer entry is marked win32 only', JSON.stringify(singleplayer?.platforms) === '["win32"]', JSON.stringify(singleplayer?.platforms))
+check('the singleplayer entry runs a jar, not the windows exe', !JSON.stringify(config.versions).includes('BEII.exe'), JSON.stringify((config.versions || []).map(version => version.entryPoint)))
+check('the singleplayer entry is not platform gated', !singleplayer?.platforms, JSON.stringify(singleplayer?.platforms))
 check('platformLabel falls back to the host', (await evaluate('platformLabel()')).value === 'Windows')
 
 process.stdout.write('\nwindows-only badge\n')
@@ -132,7 +133,8 @@ check('at least one version card is rendered', cards.length > 0, `${cards.length
 check('no card is flagged unsupported on a host that supports them', cards.every(card => !card.flagged), JSON.stringify(cards.filter(card => card.flagged)))
 check('no badge is drawn when the host supports the version', cards.every(card => card.badge === ''), JSON.stringify(cards.filter(card => card.badge)))
 
-// this is the branch a Linux user sees for BEII.exe
+// this is the branch a user sees for a version gated to another platform; no shipped version is
+// gated today, so the state is injected to keep the renderer branch covered
 const injected = (await evaluate(`(() => {
   const id = ${JSON.stringify(cards[0]?.id || '')}
   if (!id || !versionStates || typeof renderConfig !== 'function') return null
