@@ -69,6 +69,9 @@
       "kind": "singleplayer",
       "requires": "bloody-europe-1.9.3",
       "entryPoint": "BEII.exe",
+      "platforms": [
+        "win32"
+      ],
       "banner": "assets/versions/bloody-europe/banner.webp",
       "icon": "assets/branding/logo.svg",
       "screenshots": [],

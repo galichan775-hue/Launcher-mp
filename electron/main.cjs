@@ -6,6 +6,7 @@ const path = require('node:path')
 const os = require('node:os')
 const { pipeline } = require('node:stream/promises')
 const yauzl = require('yauzl')
+const platform = require('./platform.cjs')
 const launcherConfig = require('../app/launcher-config.json')
 const JAVA_DOWNLOAD_URL = 'https://adoptium.net/temurin/releases/?version=17'
 const TELEGRAM_SUPPORT_URL = 'https://t.me/communityAOC2mp/2682'
@@ -156,12 +157,26 @@ async function applyRepoUpdate() {
   const latest = await resolveRemoteVersion(current)
   // Nothing to do is a normal outcome, not a failure: the prompt must simply close.
   if (!latest || !semverGt(latest, current)) return { started: false, upToDate: true, current }
-  const dest = path.join(app.getPath('temp'), 'AOC-2-Multiplayer-Setup.exe')
+  const dest = path.join(app.getPath('temp'), platform.UPDATER_ARTIFACT)
   broadcastUpdateProgress({ phase: 'download', received: 0, total: 0, percent: 0, version: latest })
-  await downloadFile(RAW_BASE + 'AOC-2-Multiplayer-Setup.exe', dest, ({ received, total, percent }) => {
+  await downloadFile(RAW_BASE + platform.UPDATER_ARTIFACT, dest, ({ received, total, percent }) => {
     broadcastUpdateProgress({ phase: 'download', received, total, percent, version: latest })
   })
   broadcastUpdateProgress({ phase: 'launch', percent: 100, version: latest })
+
+  if (!platform.updaterCanSelfInstall()) {
+    // Installing a .deb needs root, so a silent self-install is impossible: keep the file
+    // and tell the user the exact command to run instead of failing halfway through.
+    return {
+      started: false,
+      manual: true,
+      version: latest,
+      filePath: dest,
+      fileName: path.basename(dest),
+      installCommand: platform.updaterInstallCommand(path.basename(dest))
+    }
+  }
+
   const launchError = await shell.openPath(dest)
   if (launchError) {
     try { fs.unlinkSync(dest) } catch {}
@@ -333,141 +348,26 @@ function getVersionStats(versionId) {
 }
 
 function getJavaExecutable() {
-  const candidates = new Set()
-  const addJava = candidate => {
-    if (candidate) candidates.add(path.resolve(candidate))
-  }
-  const addJavaHome = home => {
-    if (!home) return
-    addJava(path.join(home, 'bin', 'java.exe'))
-    addJava(path.join(home, 'bin', 'javaw.exe'))
-  }
+  return platform.findJavaExecutable()
+}
 
-  addJavaHome(process.env.JAVA_HOME)
-  const localJdks = process.env.USERPROFILE && path.join(process.env.USERPROFILE, '.jdks')
-  if (localJdks) {
+// ~/Documents is frequently absent on fresh Linux installs, and a save dialog pointed at a
+// missing folder either fails or silently lands somewhere unexpected.
+function writableDocumentsDirectory() {
+  const candidates = []
+  try { candidates.push(app.getPath('documents')) } catch (error) { void error }
+  try { candidates.push(app.getPath('home')) } catch (error) { void error }
+  candidates.push(process.cwd())
+  for (const candidate of candidates) {
+    if (!candidate) continue
     try {
-      for (const entry of fs.readdirSync(localJdks, { withFileTypes: true })) {
-        if (entry.isDirectory()) addJavaHome(path.join(localJdks, entry.name))
-      }
+      if (fs.statSync(candidate).isDirectory()) return candidate
     } catch (error) {
-      if (error.code !== 'ENOENT' && error.code !== 'ENOTDIR') throw error
+      if (error.code === 'ENOENT' || error.code === 'ENOTDIR' || error.code === 'EACCES') continue
+      throw error
     }
   }
-  const programRoots = [
-    process.env.ProgramW6432,
-    process.env.ProgramFiles,
-    process.env['ProgramFiles(x86)'],
-    process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Programs')
-  ].filter(Boolean)
-  for (const root of programRoots) {
-    for (const vendor of ['Eclipse Adoptium', 'Java', 'Microsoft', 'Amazon Corretto', 'Zulu']) {
-      const vendorDirectory = path.join(root, vendor)
-      try {
-        for (const entry of fs.readdirSync(vendorDirectory, { withFileTypes: true })) {
-          if (entry.isDirectory()) addJavaHome(path.join(vendorDirectory, entry.name))
-        }
-      } catch (error) {
-        if (error.code !== 'ENOENT' && error.code !== 'ENOTDIR') throw error
-      }
-    }
-  }
-  for (const javaHome of [
-    process.env.ProgramData && path.join(process.env.ProgramData, 'Oracle', 'Java'),
-    process.env.ProgramFiles && path.join(process.env.ProgramFiles, 'Common Files', 'Oracle', 'Java', 'javapath'),
-    process.env['ProgramFiles(x86)'] && path.join(process.env['ProgramFiles(x86)'], 'Common Files', 'Oracle', 'Java', 'javapath'),
-    'C:\\Java'
-  ].filter(Boolean)) {
-    addJavaHome(javaHome)
-    addJava(path.join(javaHome, 'java.exe'))
-    addJava(path.join(javaHome, 'javaw.exe'))
-  }
-  for (const root of [
-    process.env.ProgramData && path.join(process.env.ProgramData, 'Oracle', 'Java'),
-    'C:\\Java'
-  ].filter(Boolean)) {
-    try {
-      for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
-        if (entry.isDirectory()) addJavaHome(path.join(root, entry.name))
-      }
-    } catch (error) {
-      if (error.code !== 'ENOENT' && error.code !== 'ENOTDIR') throw error
-    }
-  }
-
-  for (const key of [
-    'HKLM\\SOFTWARE\\Eclipse Adoptium',
-    'HKLM\\SOFTWARE\\JavaSoft\\JDK',
-    'HKLM\\SOFTWARE\\JavaSoft\\Java Runtime Environment',
-    'HKCU\\SOFTWARE\\JavaSoft\\JDK',
-    'HKCU\\SOFTWARE\\JavaSoft\\Java Runtime Environment',
-    'HKLM\\SOFTWARE\\WOW6432Node\\JavaSoft\\JDK',
-    'HKLM\\SOFTWARE\\WOW6432Node\\JavaSoft\\Java Runtime Environment',
-    'HKLM\\SOFTWARE\\WOW6432Node\\Eclipse Adoptium'
-  ]) {
-    const result = spawnSync('reg.exe', ['query', key, '/s'], { encoding: 'utf8', windowsHide: true })
-    if (result.error && result.error.code !== 'ENOENT') throw result.error
-    if (result.status === 0) {
-      for (const match of result.stdout.matchAll(/JavaHome\s+REG_(?:EXPAND_)?SZ\s+(.+)/gi)) {
-        addJavaHome(match[1].trim())
-      }
-    }
-  }
-  for (const key of [
-    'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall',
-    'HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall',
-    'HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall'
-  ]) {
-    const result = spawnSync('reg.exe', ['query', key, '/s', '/f', 'Java 17'], {
-      encoding: 'utf8',
-      windowsHide: true,
-      timeout: 5000,
-      maxBuffer: 1024 * 1024
-    })
-    if (result.error && result.error.code !== 'ENOENT') throw result.error
-    for (const match of (result.stdout || '').matchAll(/InstallLocation\s+REG_(?:EXPAND_)?SZ\s+(.+)/gi)) {
-      addJavaHome(match[1].trim())
-    }
-  }
-
-  const where = spawnSync('where.exe', ['java.exe'], { encoding: 'utf8', windowsHide: true })
-  if (where.error && where.error.code !== 'ENOENT') throw where.error
-  if (where.status === 0) {
-    for (const candidate of where.stdout.split(/\r?\n/)) addJava(candidate.trim())
-  }
-
-  let compatibleJava = null
-  const checkedExecutables = new Set()
-  for (const executable of candidates) {
-    if (!fs.existsSync(executable)) continue
-    const java = path.basename(executable).toLowerCase() === 'javaw.exe'
-      ? path.join(path.dirname(executable), 'java.exe')
-      : executable
-    if (!fs.existsSync(java)) continue
-    const normalizedJava = path.resolve(java).toLowerCase()
-    if (checkedExecutables.has(normalizedJava)) continue
-    checkedExecutables.add(normalizedJava)
-    const result = spawnSync(java, ['-version'], {
-      encoding: 'utf8',
-      windowsHide: true,
-      timeout: 5000
-    })
-    if (result.error) {
-      if (result.error.code === 'ENOENT' || result.error.code === 'ETIMEDOUT') continue
-      throw result.error
-    }
-    const output = `${result.stdout || ''}\n${result.stderr || ''}`
-    const match = output.match(/version\s+"?(\d+)(?:\.(\d+))?/i)
-    if (result.status !== 0 || !match || Number(match[1]) < 17) continue
-    const javaw = path.join(path.dirname(java), 'javaw.exe')
-    const found = {
-      executable: fs.existsSync(javaw) ? javaw : java,
-      version: `${match[1]}.${match[2] || '0'}`
-    }
-    if (Number(match[1]) === 17) return found
-    if (!compatibleJava) compatibleJava = found
-  }
-  return compatibleJava
+  return app.getPath('temp')
 }
 
 async function finishGameSession(versionId, sessionId, error) {
@@ -682,6 +582,15 @@ function reportStatusChange() {
   }
 }
 
+// GitHub archives carry a unix mode in the high half of externalFileAttributes. Keeping the
+// execute bit matters on Linux, where a mod that ships a script or a native library would
+// otherwise be unpacked as a plain unreadable-locked file and fail to start.
+function entryMode(entry) {
+  const unixMode = (entry.externalFileAttributes >>> 16) & 0xFFFF
+  if (!unixMode) return 0o644
+  return (unixMode & 0o111) ? 0o755 : 0o644
+}
+
 function extractModArchive(archivePath, destination, onProgress) {
   return new Promise((resolve, reject) => {
     let archive
@@ -769,14 +678,14 @@ function extractModArchive(archivePath, destination, onProgress) {
       }
 
       if (isDirectory || mode === 0x4000) {
-        await fsp.mkdir(outputPath, { recursive: true })
+        await fsp.mkdir(outputPath, { recursive: true, mode: 0o755 })
         return
       }
-      await fsp.mkdir(path.dirname(outputPath), { recursive: true })
+      await fsp.mkdir(path.dirname(outputPath), { recursive: true, mode: 0o755 })
       const stream = await new Promise((resolveStream, rejectStream) => {
         archive.openReadStream(entry, (error, openedStream) => error ? rejectStream(error) : resolveStream(openedStream))
       })
-      await pipeline(stream, fs.createWriteStream(outputPath, { flags: 'wx', mode: 0o600 }))
+      await pipeline(stream, fs.createWriteStream(outputPath, { flags: 'wx', mode: entryMode(entry) }))
     }
 
     yauzl.open(archivePath, {
@@ -808,8 +717,21 @@ function extractModArchive(archivePath, destination, onProgress) {
   })
 }
 
-ipcMain.handle('launcher:get-config', () => launcherConfig)
+ipcMain.handle('launcher:get-config', () => ({ ...launcherConfig, platform: platform.describePlatform() }))
 ipcMain.handle('launcher:get-java', () => getJavaExecutable())
+ipcMain.handle('launcher:reveal-file', async (_event, targetPath) => {
+  if (typeof targetPath !== 'string' || !targetPath) throw new Error('Нет пути к файлу.')
+  // the renderer may only ask to open the folder holding a downloaded updater artifact, so the
+  // path is resolved and pinned to the temp directory instead of being opened as given
+  const resolved = path.resolve(targetPath)
+  const tempDir = path.resolve(app.getPath('temp'))
+  if (path.dirname(resolved) !== tempDir) throw new Error('Можно открыть только папку загрузки обновления.')
+  if (path.basename(resolved) !== platform.UPDATER_ARTIFACT) throw new Error('Это не файл обновления.')
+  if (!fs.existsSync(resolved)) throw new Error('Файл ещё не скачан. Сначала дождитесь загрузки.')
+  const result = await shell.openPath(tempDir)
+  if (result) throw new Error(`Не удалось открыть папку: ${result}`)
+  return { opened: true, path: tempDir }
+})
 ipcMain.handle('launcher:open-launch-log', async (_event, versionId) => {
   const version = getVersion(versionId)
   const logPath = path.join(app.getPath('userData'), 'logs', `${version.id}-latest.log`)
@@ -848,7 +770,7 @@ ipcMain.handle('launcher:create-crash-report', async (_event, { versionId, subje
   const owner = BrowserWindow.getFocusedWindow()
   const options = {
     title: 'Сохранить отчет об ошибке',
-    defaultPath: path.join(app.getPath('documents'), `AOC2-crash-report-${version.version}.txt`),
+    defaultPath: path.join(writableDocumentsDirectory(), `AOC2-crash-report-${version.version}.txt`),
     filters: [{ name: 'Отчет об ошибке', extensions: ['txt'] }]
   }
   const result = owner
@@ -972,6 +894,8 @@ ipcMain.handle('mod:get-status', async () => {
       commit: getVersionCommit(version) || '',
       external: Boolean(gameLocations[version.id]),
       searching: gameDiscoveryPromises.has(version.id),
+      supported: platform.isVersionSupported(version),
+      requiresPlatform: platform.unsupportedLabel(version),
       stats
     })
   }
@@ -1254,6 +1178,9 @@ ipcMain.handle('mod:open-folder', async (_event, versionId) => {
 
 ipcMain.handle('mod:launch', async (_event, versionId) => {
   const version = getVersion(versionId)
+  if (!platform.isVersionSupported(version)) {
+    throw new Error(platform.unsupportedMessage(version, platform.platformLabel()))
+  }
   if (launchingVersions.size > 0 || activeGames.size > 0) {
     return { started: false, alreadyRunning: true }
   }

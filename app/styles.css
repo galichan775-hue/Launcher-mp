@@ -1,6 +1,6 @@
 :root {
   color-scheme: dark;
-  font-family: Inter, "Segoe UI", sans-serif;
+    font-family: Inter, "Segoe UI", Cantarell, "Noto Sans", "DejaVu Sans", "Liberation Sans", Ubuntu, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   --background: #1b1b1b;
@@ -195,7 +195,7 @@ h1 { margin-bottom: 6px; font-size: 25px; font-weight: 650; letter-spacing: -.65
 .screenshot-card:before { background: linear-gradient(0deg,#101512e8,transparent 64%); transition: opacity .18s; }
 .screenshot-card:hover:before { opacity: .7; }.screenshot-card span { position: relative; }
 .settings-panel { max-width: 620px; margin-top: 26px; padding: 19px; border: 1px solid var(--border); border-radius: 12px; background: #222; }
-.settings-panel h2 { margin: 0 0 6px; font-size: 12px; font-weight: 600; }.settings-panel p { color: #a4a4a4; font-size: 10px; }.settings-path { margin: 11px 0 16px; padding: 10px; border: 1px solid #373737; border-radius: 7px; background: #1c1c1c; color: #cbcbcb; font-family: Consolas,monospace; font-size: 11px; }
+.settings-panel h2 { margin: 0 0 6px; font-size: 12px; font-weight: 600; }.settings-panel p { color: #a4a4a4; font-size: 10px; }.settings-path { margin: 11px 0 16px; padding: 10px; border: 1px solid #373737; border-radius: 7px; background: #1c1c1c; color: #cbcbcb; font-family: Consolas, "Cascadia Mono", "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 11px; }
 .update-badge { flex: none; align-self: flex-start; padding: 4px 9px; border: 1px solid #a8c7ff4d; border-radius: 999px; background: #2b3550; color: #cfdcff; font-size: 10px; letter-spacing: .2px; }
 .version-card.has-update { border-color: #6d86b8; box-shadow: 0 0 0 1px #6d86b833,0 10px 26px #0006; }
 .version-card.has-update .card-status { color: #cfdcff; }
@@ -265,7 +265,7 @@ h1 { margin-bottom: 6px; font-size: 25px; font-weight: 650; letter-spacing: -.65
 .destination-icon { color: #b9bdc2; font-size: 17px; }
 .download-destination>span:nth-child(2) { display: grid; min-width: 0; gap: 4px; }
 .download-destination b { color: #dedede; font-size: 10px; font-weight: 550; }
-.download-destination small { overflow: hidden; color: #929292; font-family: Consolas,monospace; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.download-destination small { overflow: hidden; color: #929292; font-family: Consolas, "Cascadia Mono", "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .destination-button { width: auto; margin-left: auto; padding: 8px 2px; border: 0; font-size: 10px; }
 .button-primary:disabled,.soft-button:disabled { cursor: wait; opacity: .68; }
 .button-loading { min-width: 110px; }
@@ -541,6 +541,12 @@ a.community-link:hover { border-color: #6d7177; background: #303236; color: whit
 .startup-update-progress span { min-width: 92px; font-size: 10px; font-variant-numeric: tabular-nums; text-align: right; color: #aeb4c1; }
 .startup-update-error { margin: 4px 0 0; font-size: 10px; line-height: 1.45; color: #f0a7a7; text-align: center; }
 .startup-update-error[hidden] { display: none; }
+.startup-update-manual { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 4px 0 0; }
+.startup-update-manual[hidden] { display: none; }
+.startup-update-manual code { display: block; max-width: 100%; padding: 6px 9px; border: 1px solid #3d3d3d; border-radius: 7px; background: #161616; color: #d7d7d7; font-family: Consolas, "Cascadia Mono", "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 10px; line-height: 1.4; text-align: left; overflow-wrap: anywhere; user-select: text; -webkit-app-region: no-drag; }
+.startup-update-note { font-size: 9px; line-height: 1.4; color: #8f8f8f; text-align: center; }
+.platform-badge { flex: none; padding: 2px 7px; border: 1px solid #4a4a4a; border-radius: 999px; background: #232323; color: #a8a8a8; font-size: 9px; font-weight: 500; white-space: nowrap; }
+.version-card.unsupported-platform .version-card-art { filter: saturate(.55) brightness(.78); }
 .startup-window-controls { position: absolute; top: 10px; right: 12px; display: flex; gap: 5px; -webkit-app-region: no-drag; }
 .startup-window-controls button { font-size: 19px; }
 @keyframes startup-loading { from { transform: translateX(-110%); } to { transform: translateX(370%); } }
@@ -635,7 +641,7 @@ a.community-link:hover { border-color: #6d7177; background: #303236; color: whit
 .color-popover-swatch:hover { border-color: #ffffff6b; transform: scale(1.1); }
 .color-popover-swatch.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .color-popover-hex { display: flex; align-items: center; gap: 8px; margin-top: 11px; color: #969696; font-size: 10px; }
-.color-popover-hex input { width: 96px; height: 28px; padding: 0 9px; border: 1px solid #3d3d3d; border-radius: 7px; background: #161616; color: #e6e6e6; font-family: Consolas,monospace; font-size: 11px; user-select: text; }
+.color-popover-hex input { width: 96px; height: 28px; padding: 0 9px; border: 1px solid #3d3d3d; border-radius: 7px; background: #161616; color: #e6e6e6; font-family: Consolas, "Cascadia Mono", "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 11px; user-select: text; }
 .theme-actions { display: flex; }
 .theme-actions .soft-button { height: 32px; }
 

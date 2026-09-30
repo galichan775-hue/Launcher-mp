@@ -41,6 +41,8 @@ const translations = {
     installLocation: 'Расположение игры',
     open: 'Открыть',
     javaRequired: 'Для запуска требуется Java 17 или новее.',
+    windowsOnly: 'Только для {platform}',
+    windowsOnlyHint: 'Этот мод запускается только на {platform}. На {current} используй мультиплеерные версии.',
     creators: 'СОЗДАТЕЛИ',
     projectCreators: 'Авторы проекта',
     settingsEyebrow: 'ПРИЛОЖЕНИЕ',
@@ -119,6 +121,10 @@ const translations = {
     startupUpdateLater: 'Позже',
     startupUpdateDownloading: 'Загружаю обновление {version}...',
     startupUpdateStarted: 'Установщик запущен. Завершите обновление и перезапустите лаунчер.',
+    startupUpdateManualText: 'Обновление {version} скачано. Для установки выполни команду:',
+    startupUpdateManualNote: 'Потребуется пароль администратора. После установки перезапусти лаунчер.',
+    startupUpdateReveal: 'Открыть папку',
+    startupUpdateClose: 'Закрыть',
     updateError: 'Не удалось проверить обновление лаунчера.',
     languagePickerEyebrow: 'ИНТЕРФЕЙС',
     languagePickerTitle: 'Выбери язык',
@@ -203,6 +209,8 @@ const translations = {
     installLocation: 'Install location',
     open: 'Open',
     javaRequired: 'Java 17 or newer is required to play.',
+    windowsOnly: '{platform} only',
+    windowsOnlyHint: 'This mod only runs on {platform}. On {current}, use the multiplayer versions.',
     creators: 'CREDITS',
     projectCreators: 'Project creators',
     settingsEyebrow: 'APPLICATION',
@@ -281,6 +289,10 @@ const translations = {
     startupUpdateLater: 'Later',
     startupUpdateDownloading: 'Downloading update {version}...',
     startupUpdateStarted: 'Installer started. Finish the update and restart the launcher.',
+    startupUpdateManualText: 'Update {version} is downloaded. Install it with this command:',
+    startupUpdateManualNote: 'You will be asked for your administrator password. Restart the launcher afterwards.',
+    startupUpdateReveal: 'Open folder',
+    startupUpdateClose: 'Close',
     updateError: 'Could not check for launcher updates.',
     languagePickerEyebrow: 'INTERFACE',
     languagePickerTitle: 'Choose a language',
@@ -830,6 +842,21 @@ document.getElementById('brand-subtitle').textContent = branding.subtitle
     versionNumber.textContent = `v${version.version}`
     header.append(name, versionNumber)
 
+    const versionState = versionStates.get(version.id)
+    const requiredPlatform = versionState?.requiresPlatform || ''
+    const unsupportedHere = versionState?.supported === false
+    if (unsupportedHere && requiredPlatform) {
+      const badge = document.createElement('span')
+      badge.className = 'platform-badge'
+      badge.textContent = t('windowsOnly', { platform: requiredPlatform })
+      header.append(badge)
+      card.classList.add('unsupported-platform')
+      card.title = t('windowsOnlyHint', {
+        platform: requiredPlatform,
+        current: config.platform?.label || platformLabel()
+      })
+    }
+
     const creatorLine = document.createElement('span')
     creatorLine.className = 'version-card-creator'
     const creator = getCreator(version)
@@ -857,18 +884,20 @@ document.getElementById('brand-subtitle').textContent = branding.subtitle
     cardTime.textContent = versionStats ? formatPlaytime(versionStats.playSeconds) : formatPlaytime(0)
     const cardStatus = document.createElement('span')
     cardStatus.className = 'card-status'
-    cardStatus.textContent = versionUpdates.get(version.id)?.available
-      ? t('updateAvailable')
-      : versionStates.get(version.id)?.searching
-        ? t('searchingGame')
-        : versionStates.get(version.id)?.installed
-          ? versionStates.get(version.id)?.stats?.running
-            ? t('playing')
-            : (language === 'en' ? 'Installed' : 'Установлена')
-          : /^[a-f0-9]{40}$/i.test(version.commit || '')
-            ? (language === 'en' ? 'Ready to install' : 'Готова к установке')
-            : t('versionNotPublished')
-    if (versionUpdates.get(version.id)?.available) card.classList.add('has-update')
+    cardStatus.textContent = unsupportedHere && requiredPlatform
+      ? t('windowsOnly', { platform: requiredPlatform })
+      : versionUpdates.get(version.id)?.available
+        ? t('updateAvailable')
+        : versionStates.get(version.id)?.searching
+          ? t('searchingGame')
+          : versionStates.get(version.id)?.installed
+            ? versionStates.get(version.id)?.stats?.running
+              ? t('playing')
+              : (language === 'en' ? 'Installed' : 'Установлена')
+            : /^[a-f0-9]{40}$/i.test(version.commit || '')
+              ? (language === 'en' ? 'Ready to install' : 'Готова к установке')
+              : t('versionNotPublished')
+    if (versionUpdates.get(version.id)?.available && !unsupportedHere) card.classList.add('has-update')
     footer.append(cardTime, cardStatus)
     content.append(header, creatorLine, description, metadata, footer)
     card.append(art, content)
@@ -888,6 +917,10 @@ document.getElementById('brand-subtitle').textContent = branding.subtitle
     card.classList.toggle('selected', card.dataset.versionId === activeVersionId)
   })
   renderCreators()
+}
+
+function platformLabel() {
+  return config?.platform?.label || 'Linux'
 }
 
 function formatPlaytime(seconds) {
@@ -1525,7 +1558,11 @@ const updateCard = {
   progress: document.getElementById('startup-update-progress'),
   bar: document.getElementById('startup-update-bar'),
   status: document.getElementById('startup-update-status'),
-  error: document.getElementById('startup-update-error')
+  error: document.getElementById('startup-update-error'),
+  manual: document.getElementById('startup-update-manual'),
+  command: document.getElementById('startup-update-command'),
+  note: document.getElementById('startup-update-note'),
+  reveal: document.getElementById('startup-update-reveal')
 }
 
 function formatBytes(bytes) {
@@ -1564,8 +1601,46 @@ function closeUpdatePrompt() {
   if (updateCard.root) updateCard.root.hidden = true
   if (updateCard.error) { updateCard.error.hidden = true; updateCard.error.textContent = '' }
   if (updateCard.progress) updateCard.progress.hidden = true
+  if (updateCard.manual) { updateCard.manual.hidden = true; if (updateCard.command) updateCard.command.textContent = '' }
   if (updateCard.install) { updateCard.install.disabled = false }
+  if (updateCard.later) updateCard.later.textContent = t('startupUpdateLater')
   hideStartupScreen()
+}
+
+// A .deb cannot be installed without root, so the main process hands back the downloaded
+// path and the exact command instead of starting an installer.
+function showManualInstall(result) {
+  if (!updateCard.manual) {
+    updateCard.text.textContent = t('startupUpdateManualText', { version: result.version })
+    return
+  }
+  updateCard.text.textContent = t('startupUpdateManualText', { version: result.version })
+  if (updateCard.command) updateCard.command.textContent = result.installCommand || ''
+  if (updateCard.note) updateCard.note.textContent = t('startupUpdateManualNote')
+  if (updateCard.reveal) {
+    updateCard.reveal.textContent = t('startupUpdateReveal')
+    updateCard.reveal.hidden = false
+    updateCard.reveal.disabled = false
+  }
+  updateCard.manual.hidden = false
+  if (updateCard.progress) updateCard.progress.hidden = true
+  if (updateCard.install) { updateCard.install.hidden = true }
+  if (updateCard.later) updateCard.later.textContent = t('startupUpdateClose')
+}
+
+if (updateCard.reveal) {
+  updateCard.reveal.addEventListener('click', async () => {
+    const target = pendingRepoUpdate?.filePath
+    if (!target) return
+    updateCard.reveal.disabled = true
+    try {
+      await window.aocLauncher.revealFile(target)
+    } catch (error) {
+      showUpdateError(error.message || t('updateError'))
+    } finally {
+      updateCard.reveal.disabled = false
+    }
+  })
 }
 
 function showStartupUpdate(update) {
@@ -1580,6 +1655,13 @@ function showStartupUpdate(update) {
   updateCard.root.hidden = false
   if (updateCard.error) { updateCard.error.hidden = true; updateCard.error.textContent = '' }
   if (updateCard.progress) updateCard.progress.hidden = true
+  if (updateCard.manual) {
+    updateCard.manual.hidden = true
+    if (updateCard.command) updateCard.command.textContent = ''
+  }
+  if (updateCard.reveal) updateCard.reveal.hidden = true
+  if (updateCard.install) { updateCard.install.disabled = false; updateCard.install.hidden = false }
+  if (updateCard.later) updateCard.later.textContent = t('startupUpdateLater')
   if (updateCard.bar) updateCard.bar.style.width = '0%'
   updateCard.install.disabled = false
   // The load is finished, so drop the spinner and the stale "checking for updates" caption.
@@ -1606,6 +1688,13 @@ updateCard.install.addEventListener('click', async () => {
     const result = await window.aocLauncher.applyRepoUpdate()
     // The version was already current: that is not an error, just close the gate.
     if (result && result.upToDate) { closeUpdatePrompt(); return }
+    // Linux: the package is downloaded but installing it needs root, so hand over the command.
+    if (result && result.manual) {
+      pendingRepoUpdate = { ...pendingRepoUpdate, ...result }
+      setUpdateProgress({ percent: 100, phase: 'launch' })
+      showManualInstall(result)
+      return
+    }
     updateCard.text.textContent = t('startupUpdateStarted')
     setUpdateProgress({ percent: 100, phase: 'launch' })
   } catch (error) {

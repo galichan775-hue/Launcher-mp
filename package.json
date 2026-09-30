@@ -1,14 +1,20 @@
 {
   "name": "aoc-2-multiplayer",
-  "version": "1.2.8",
+  "version": "1.2.9",
   "private": true,
   "description": "Age of History II multiplayer mod launcher",
   "author": "AOC 2 Multiplayer",
+  "desktopName": "aoc-2-multiplayer.desktop",
   "main": "electron/main.cjs",
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win nsis --publish never",
-    "dist:dir": "electron-builder --win dir --publish never"
+    "dist:dir": "electron-builder --win dir --publish never",
+    "icons": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/Make-LinuxIcons.ps1",
+    "dist:deb": "node tools/build-deb.mjs",
+    "verify:deb": "node tools/verify-deb.mjs",
+    "test:platform": "node tools/platform-tests.mjs",
+    "test:ui": "node tools/ui-tests.mjs"
   },
   "devDependencies": {
     "electron": "^44.4.5",
@@ -62,6 +68,57 @@
       "runAfterFinish": true,
       "differentialPackage": false,
       "uninstallDisplayName": "AOC 2 Multiplayer"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "AOC-2-Multiplayer-linux-x64.${ext}",
+      "executableName": "aoc-2-multiplayer",
+      "icon": "build/icons",
+      "maintainer": "AOC 2 Multiplayer",
+      "vendor": "AOC 2 Multiplayer",
+      "category": "Game",
+      "synopsis": "Age of History II multiplayer mod launcher",
+      "description": "Launcher for the Age of History II multiplayer and singleplayer mods. Downloads, updates and starts game versions on Linux Mint, Debian and Ubuntu.",
+      "desktop": {
+        "entry": {
+          "Name": "AOC 2 Multiplayer",
+          "GenericName": "Mod Launcher",
+          "Comment": "Age of History II multiplayer mod launcher",
+          "Categories": "Game;",
+          "StartupWMClass": "AOC 2 Multiplayer",
+          "Terminal": "false"
+        }
+      },
+      "syncDesktopName": true
+    },
+    "deb": {
+      "packageName": "aoc-2-multiplayer",
+      "packageCategory": "games",
+      "priority": "optional",
+      "compression": "xz",
+      "depends": [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libuuid1",
+        "libsecret-1-0",
+        "libasound2",
+        "libgbm1"
+      ],
+      "recommends": [
+        "libappindicator3-1"
+      ]
     }
   }
 }
