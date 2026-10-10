@@ -45,6 +45,10 @@
       },
       "repository": "galichan775-hue/bloody-europe-1.9.3-mp",
       "commit": "c38ddfa08ba89b85044fff0b43a1530c99b93400",
+      "archive": {
+        "bytes": 440018155,
+        "sha256": "054af98b6977920113360d1a680b51ba47a31cfa8000107a2d75e576361a6591"
+      },
       "banner": "assets/versions/1.9.3/banner.webp",
       "icon": "assets/branding/logo.svg",
       "screenshots": [],
@@ -88,29 +92,78 @@
       },
       "repository": "galichan775-hue/1.9.3-mp",
       "commit": "49fb0289272498615a712dd692d9cb08e3bdb5de",
+      "archive": {
+        "bytes": 363419872,
+        "sha256": "4181646232e0f6db2def56543a2fac1d6485959d7b805a8422dd0ef384cfbbbd"
+      },
       "banner": "assets/versions/1.9.3-mp/banner.webp",
       "icon": "assets/branding/logo.svg",
       "screenshots": [],
       "changes": { "added": [], "changed": [], "removed": [] }
     },
     {
-      "id": "aoh2mp-1.9.4",
-      "version": "1.9.4",
-      "name": "AoH2MP 1.9.4",
+      "id": "aoh2mp-1.9.5",
+      "version": "1.9.5",
+      "name": "AoH2MP 1.9.5",
       "tagline": "Age of History II с мультиплеером и новыми функциями",
       "taglineEn": "Age of History II with multiplayer and new features",
-      "description": "AoH2MP 1.9.4 — Age of History II с мультиплеером и новыми функциями.\n\nКроме обычного мультиплеера появились автоход и автопостройка: они берут на себя рутинные действия и оставляют больше времени на стратегию.\n\nСоздайте комнату или подключитесь к чужой, чтобы играть на одной карте вместе. Подключение работает через Steam и по локальной сети, а встроенный чат помогает обсуждать союзы прямо во время матча.",
-      "descriptionEn": "AoH2MP 1.9.4 — Age of History II with multiplayer and new features.\n\nOn top of regular multiplayer it introduces auto-move and auto-build, which take the repetitive work off your hands and leave more time for strategy.\n\nCreate a room or join someone else's to play together on one map. Connect through Steam or over a local network, and use the in-game chat to discuss alliances while the match is running.",
+      "description": "AoH2MP 1.9.5 — Age of History II с мультиплеером и новыми функциями.\n\nКроме обычного мультиплеера появились автоход и автопостройка: они берут на себя рутинные действия и оставляют больше времени на стратегию.\n\nСоздайте комнату или подключитесь к чужой, чтобы играть на одной карте вместе. Подключение работает через Steam и по локальной сети, а встроенный чат помогает обсуждать союзы прямо во время матча.",
+      "descriptionEn": "AoH2MP 1.9.5 — Age of History II with multiplayer and new features.\n\nOn top of regular multiplayer it introduces auto-move and auto-build, which take the repetitive work off your hands and leave more time for strategy.\n\nCreate a room or join someone else's to play together on one map. Connect through Steam or over a local network, and use the in-game chat to discuss alliances while the match is running.",
       "creator": {
         "name": "kkun3756",
         "url": "https://t.me/kkun3756"
       },
-      "repository": "galichan775-hue/1.9.4-mp",
-      "commit": "8f811121fb3425f9104fdfd6d125007a8d7ad9fb",
-      "banner": "assets/versions/1.9.4-mp/banner.webp",
+      "repository": "galichan775-hue/1.9.5-mp",
+      "commit": "e316930f73fee3570ec2782ae802e8a6d9ae4b2d",
+      "archive": {
+        "bytes": 363506853,
+        "sha256": "01563f29c3cbd366af0e95e5a8c340e8251c4c8a65c7116614865fac9c962ed6"
+      },
+      "banner": "assets/versions/1.9.5-mp/banner.webp",
+      "icon": "assets/branding/logo.svg",
+      "screenshots": [],
+      "changes": { "added": [], "changed": [], "removed": [] }
+    },
+    {
+      "id": "aoh2mp-solo-1.9.3",
+      "version": "1.9.3",
+      "name": "Age of History II (одиночная)",
+      "tagline": "Одиночная Age of History II на файлах 1.9.3",
+      "taglineEn": "Singleplayer Age of History II on the 1.9.3 files",
+      "description": "Age of History II (одиночная) — базовая Age of History II на файлах версии 1.9.3.\n\nЭто обычная одиночная игра без мультиплеера. Она устанавливается вместе с файлами AoH2MP 1.9.3 и запускается отдельным пунктом.\n\nЭта версия появляется только после установки AoH2MP 1.9.3.",
+      "descriptionEn": "Age of History II (singleplayer) — the base Age of History II running on the 1.9.3 files.\n\nThis is the regular singleplayer game without multiplayer. It ships together with the AoH2MP 1.9.3 files and is launched as its own entry.\n\nThis version only appears once AoH2MP 1.9.3 is installed.",
+      "kind": "singleplayer",
+      "requires": "aoh2mp-1.9.3",
+      "entryPoint": "AoC2.jar",
+      "banner": "assets/versions/1.9.3-mp/banner.webp",
+      "icon": "assets/branding/logo.svg",
+      "screenshots": [],
+      "changes": { "added": [], "changed": [], "removed": [] }
+    },
+    {
+      "id": "addon-plus",
+      "version": "1.0",
+      "name": "Addon+ Age of History 2",
+      "tagline": "Одиночный мод Addon+ для Age of History II",
+      "taglineEn": "Addon+ singleplayer mod for Age of History II",
+      "description": "Addon+ — одиночный мод для Age of History II.\n\nОн добавляет новые сценарии, страны, карты и механики, расширяя базовую игру.\n\nЭто одиночная версия без мультиплеера.",
+      "descriptionEn": "Addon+ — a singleplayer mod for Age of History II.\n\nIt adds new scenarios, nations, maps and mechanics, expanding the base game.\n\nThis is the singleplayer version, without multiplayer.",
+      "kind": "singleplayer",
+      "entryPoint": "AoC2.jar",
+      "repository": "galichan775-hue/Addon-",
+      "commit": "1929f91d6f7fbd82c5344a9b3ff56e8ce62e675c",
+      "archive": {
+        "bytes": 619518309,
+        "sha256": "ba232a2ec5d3c47e45699fa2b57189f287f8ad16f32803d8bc2180585d5ad06b"
+      },
+      "banner": "assets/versions/addon-plus/banner.webp",
       "icon": "assets/branding/logo.svg",
       "screenshots": [],
       "changes": { "added": [], "changed": [], "removed": [] }
     }
-  ]
+  ],
+  "updater": {
+    "packageBytes": 89652640,
+    "sha256": "90c90db509cbab98d6fd90938088284ec56df7d7f31e5cab472998188d2c8e3b"
+  }
 }

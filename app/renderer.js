@@ -95,6 +95,15 @@ const translations = {
     statsError: 'Не удалось обновить статистику игры.',
     downloading: 'Загружаем файлы игры',
     downloadSource: 'Загрузка игровых файлов · можно свернуть окно',
+    resumingDownload: 'Продолжаем загрузку с прошлого места',
+    reconnecting: 'Связь прервана, переподключаемся… попытка {attempt}',
+    retryCountdown: 'Повтор через {seconds} с',
+    downloadCancelled: 'Загрузка отменена',
+    downloadCancelledHint: 'Уже скачано {size} — следующий запуск продолжит с этого места',
+    downloadFailed: 'Загрузка не удалась',
+    downloadFailedHint: 'Скачано {size} — следующая попытка продолжит с этого места',
+    cancelDownload: 'Отменить',
+    extracting: 'Распаковка игровых файлов',
     preparingFiles: 'Проверяем файлы и готовим игру…',
     verifyingFiles: 'Проверка файлов игры и подготовка к первому запуску',
     installed: 'Игра установлена',
@@ -263,6 +272,15 @@ const translations = {
     statsError: 'Could not update game statistics.',
     downloading: 'Downloading game files',
     downloadSource: 'Downloading game files · you can minimize this window',
+    resumingDownload: 'Resuming from where it stopped',
+    reconnecting: 'Connection lost, reconnecting… attempt {attempt}',
+    retryCountdown: 'Retrying in {seconds} s',
+    downloadCancelled: 'Download cancelled',
+    downloadCancelledHint: '{size} already downloaded — the next run continues from there',
+    downloadFailed: 'Download failed',
+    downloadFailedHint: '{size} downloaded — the next attempt continues from there',
+    cancelDownload: 'Cancel',
+    extracting: 'Extracting game files',
     preparingFiles: 'Checking files and preparing the game…',
     verifyingFiles: 'Verifying game files and preparing for first launch',
     installed: 'Game installed',
@@ -369,6 +387,7 @@ let progressFrame = 0
 let crashVersionId = null
 let extractionSample = null
 let launchedVersionId = null
+let downloadingVersionId = null
 
 function readStorage(key) {
   try {
@@ -772,16 +791,18 @@ function getCreator(version) {
 }
 
 function renderCreators() {
+  const singleplayer = selectedVersion?.kind === 'singleplayer'
   const creator = getCreator(selectedVersion)
   const modLabel = language === 'en' ? 'Mod by' : 'Автор мода'
   const launcherLabel = language === 'en' ? 'Launcher by' : 'Автор лаунчера'
-  const links = [
-    createLink(`${modLabel} · ${creator.name}`, creator.url),
-    createLink(`${launcherLabel} · ${config.branding.launcherCreator.name}`, config.branding.launcherCreator.url)
-  ]
-  document.getElementById('about-creator-list').replaceChildren(...links.map(link => link.cloneNode(true)))
+  const launcherLink = createLink(`${launcherLabel} · ${config.branding.launcherCreator.name}`, config.branding.launcherCreator.url)
+  // Singleplayer entries have no mod author, so only the launcher credit is shown.
+  const aboutLinks = singleplayer
+    ? [launcherLink]
+    : [createLink(`${modLabel} · ${creator.name}`, creator.url), launcherLink]
+  document.getElementById('about-creator-list').replaceChildren(...aboutLinks.map(link => link.cloneNode(true)))
   document.getElementById('version-creator').replaceChildren(
-    createLink(`${modLabel} · ${creator.name}`, creator.url)
+    ...(singleplayer ? [] : [createLink(`${modLabel} · ${creator.name}`, creator.url)])
   )
   renderLinks(document.getElementById('about-community-links'), config.community)
 }
@@ -899,7 +920,9 @@ document.getElementById('brand-subtitle').textContent = branding.subtitle
               : t('versionNotPublished')
     if (versionUpdates.get(version.id)?.available && !unsupportedHere) card.classList.add('has-update')
     footer.append(cardTime, cardStatus)
-    content.append(header, creatorLine, description, metadata, footer)
+    // Singleplayer entries never show a mod author, so the credits stay on multiplayer versions.
+    if (version.kind === 'singleplayer') content.append(header, description, metadata, footer)
+    else content.append(header, creatorLine, description, metadata, footer)
     card.append(art, content)
 
     const select = () => selectVersion(version.id)
@@ -949,6 +972,13 @@ function renderVersionDetails(version) {
   const stats = versionStates.get(version.id)?.stats || { playSeconds: 0, lastPlayed: null, sessions: 0 }
   document.getElementById('version-title').textContent = version.name
   document.getElementById('version-hero-title').textContent = version.name
+  const heroKicker = document.querySelector('.version-hero-kicker')
+  if (heroKicker) {
+    const mode = version.kind === 'singleplayer'
+      ? (language === 'en' ? 'SINGLEPLAYER' : 'ОДИНОЧНАЯ')
+      : 'MULTIPLAYER'
+    heroKicker.textContent = `AO H 2 · ${mode}`
+  }
   document.getElementById('version-banner').src = version.banner
   document.getElementById('version-banner').alt = `${version.name} banner`
   const description = document.getElementById('version-description')
@@ -975,7 +1005,9 @@ function renderVersionDetails(version) {
   }
   screenshots.hidden = sources.length === 0
   renderVersionChanges(version)
-  document.getElementById('delete-mod').hidden = !installed || Boolean(versionStates.get(version.id)?.external)
+  // Solo entries that ride on another version's files must not delete the shared folder.
+  const sharedFiles = version.kind === 'singleplayer' && Boolean(version.requires)
+  document.getElementById('delete-mod').hidden = !installed || sharedFiles || Boolean(versionStates.get(version.id)?.external)
   renderVersionUpdateState()
 }
 
@@ -1093,6 +1125,7 @@ function renderInstallState(status) {
 }
 
 function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
   if (bytes < 1000) return `${Math.round(bytes)} B`
   if (bytes < 1_000_000) return `${(bytes / 1000).toFixed(1)} KB`
   if (bytes < 1_000_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`
@@ -1125,12 +1158,66 @@ function resetProgress() {
   displayedProgress = 0
   targetProgress = 0
   extractionSample = null
+  progressPhase = ''
+  setCancelVisible(false)
+  document.getElementById('progress-bar').classList.remove('indeterminate', 'retrying')
   document.getElementById('progress-bar').style.transform = 'scaleX(0)'
   document.getElementById('progress-glow').style.left = '0%'
 }
 
-function handleProgress(progress) {
+// The bar reports the phase it is in, never a blended guess: a download bar that creeps to 72%
+// and then sits there is worse than a labelled 47%. Every number shown is measured, and when a
+// size is genuinely unknown the bar is indeterminate instead of inventing progress.
+let progressPhase = ''
+let retryCountdownTimer = 0
+
+function setProgressPhase(phase) {
+  if (progressPhase === phase) return
+  progressPhase = phase
+  extractionSample = null
+}
+
+function showProgressPanel() {
   const panel = document.getElementById('download-progress')
+  panel.hidden = false
+  panel.classList.add('active')
+  document.querySelector('.download-spinner').classList.add('spinning')
+  startProgressAnimation()
+}
+
+function setCancelVisible(visible) {
+  const button = document.getElementById('progress-cancel')
+  if (!button) return
+  button.hidden = !visible
+}
+
+function formatDuration(seconds) {
+  if (!Number.isFinite(seconds) || seconds <= 0) return ''
+  if (seconds < 60) return `${Math.ceil(seconds)} s`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}:${String(Math.ceil(seconds % 60) % 60).padStart(2, '0')}`
+  const hours = Math.floor(minutes / 60)
+  return `${hours}:${String(minutes % 60).padStart(2, '0')}`
+}
+
+function stopRetryCountdown() {
+  if (retryCountdownTimer) clearInterval(retryCountdownTimer)
+  retryCountdownTimer = 0
+}
+
+function startRetryCountdown(label, seconds) {
+  stopRetryCountdown()
+  let left = Math.max(1, Math.ceil((Number(seconds) || 0) / 1000))
+  const eta = document.getElementById('progress-eta')
+  eta.textContent = t('retryCountdown', { seconds: left })
+  retryCountdownTimer = setInterval(() => {
+    left -= 1
+    eta.textContent = t('retryCountdown', { seconds: Math.max(0, left) })
+    if (left <= 0) stopRetryCountdown()
+  }, 1000)
+}
+
+function handleProgress(progress) {
   const label = document.getElementById('progress-message')
   const percent = document.getElementById('progress-percent')
   const bar = document.getElementById('progress-bar')
@@ -1138,71 +1225,141 @@ function handleProgress(progress) {
   const speed = document.getElementById('progress-speed')
   const eta = document.getElementById('progress-eta')
   const footnote = document.getElementById('progress-footnote')
-  panel.hidden = false
-  bar.classList.remove('indeterminate')
-  document.querySelector('.download-spinner').classList.add('spinning')
+  showProgressPanel()
 
   if (progress.phase === 'download') {
-    label.textContent = t('downloading')
+    setProgressPhase('download')
+    stopRetryCountdown()
+    setCancelVisible(true)
+    const ratio = progress.total ? progress.received / progress.total : 0
+    const exactPercent = progress.total ? Math.min(100, Math.floor(ratio * 100)) : null
+    label.textContent = progress.starting && progress.received > 0
+      ? t('resumingDownload')
+      : t('downloading')
     footnote.textContent = t('downloadSource')
     size.textContent = progress.total
       ? `${formatBytes(progress.received)} / ${formatBytes(progress.total)}`
-      : `${formatBytes(progress.received)}`
+      : formatBytes(progress.received)
     speed.textContent = formatRate(progress.speedBytesPerSecond)
+    percent.textContent = exactPercent === null ? '—' : `${exactPercent}%`
     if (progress.total) {
-      targetProgress = Math.min(.9, progress.received / progress.total * .9)
-      percent.textContent = `${Math.floor(progress.received / progress.total * 90)}%`
+      targetProgress = Math.max(0, Math.min(1, ratio))
+      bar.classList.remove('indeterminate')
       const remaining = Math.max(0, progress.total - progress.received)
-      const seconds = progress.speedBytesPerSecond > 0 ? Math.ceil(remaining / progress.speedBytesPerSecond) : 0
-      eta.textContent = seconds
-        ? `${t('wait')} ${seconds >= 60 ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` : `${seconds} s`}`
-        : t('starting')
+      const seconds = progress.speedBytesPerSecond > 0 ? remaining / progress.speedBytesPerSecond : 0
+      eta.textContent = seconds > 0 ? `${t('wait')} ${formatDuration(seconds)}` : t('starting')
     } else {
-      targetProgress = Math.min(.72, .08 + Math.log10(Math.max(1, progress.received / 100_000)) * .2)
-      percent.textContent = ''
+      // No size to compare against: show motion, not a number that would only be a guess.
+      targetProgress = 0
+      percent.textContent = '—'
       eta.textContent = t('starting')
       bar.classList.add('indeterminate')
     }
+
+    if (progress.retrying) {
+      // A paused bar must read as "reconnecting", otherwise it looks like a hung app.
+      label.textContent = t('reconnecting', { attempt: (progress.attempt || 1) + 1 })
+      footnote.textContent = progress.error || t('downloadSource')
+      bar.classList.add('retrying')
+      startRetryCountdown(label, progress.retryInMs)
+    } else {
+      bar.classList.remove('retrying')
+    }
     startProgressAnimation()
-  } else if (progress.phase === 'extract') {
-    label.textContent = t('extractingFiles', { percent: progress.percent })
+    return
+  }
+
+  if (progress.phase === 'extract') {
+    setProgressPhase('extract')
+    stopRetryCountdown()
+    setCancelVisible(false)
+    label.textContent = t('extracting')
     footnote.textContent = t('verifyingFiles')
-    targetProgress = .9 + .09 * (progress.percent / 100)
-    percent.textContent = `${Math.min(99, 90 + Math.floor(progress.percent * .09))}%`
+    const phasePercent = Math.max(0, Math.min(100, progress.percent || 0))
+    targetProgress = phasePercent / 100
+    percent.textContent = `${Math.floor(phasePercent)}%`
+    bar.classList.remove('indeterminate', 'retrying')
     speed.textContent = ''
-    size.textContent = `${formatBytes(progress.expandedSize)} ${t('unpacked')}`
+    size.textContent = `${formatBytes(progress.expandedSize || 0)} ${t('unpacked')}`
     const now = Date.now()
     if (!extractionSample || now - extractionSample.at > 700) {
       const entriesPerSecond = extractionSample
         ? (progress.completedEntries - extractionSample.completed) / Math.max((now - extractionSample.at) / 1000, .001)
         : 0
       extractionSample = { at: now, completed: progress.completedEntries }
-      const remaining = progress.entryCount - progress.completedEntries
-      const seconds = entriesPerSecond > 0 ? Math.ceil(remaining / entriesPerSecond) : 0
-      eta.textContent = seconds ? `${t('wait')} ${seconds >= 60 ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` : `${seconds} s`}` : t('calculating')
+      const remaining = Math.max(0, (progress.entryCount || 0) - (progress.completedEntries || 0))
+      const seconds = entriesPerSecond > 0 ? remaining / entriesPerSecond : 0
+      eta.textContent = seconds > 0 ? `${t('wait')} ${formatDuration(seconds)}` : t('calculating')
     }
-    bar.classList.remove('indeterminate')
     startProgressAnimation()
-  } else if (progress.phase === 'complete') {
+    return
+  }
+
+  if (progress.phase === 'complete') {
+    setProgressPhase('complete')
+    stopRetryCountdown()
+    setCancelVisible(false)
     label.textContent = t('installed')
     footnote.textContent = t('gameReady')
     targetProgress = 1
     percent.textContent = '100%'
     speed.textContent = ''
     eta.textContent = '✓'
-    bar.classList.remove('indeterminate')
+    size.textContent = progress.total ? `${formatBytes(progress.total)}` : ''
+    bar.classList.remove('indeterminate', 'retrying')
     startProgressAnimation()
-    extractionSample = null
     setTimeout(() => {
+      stopRetryCountdown()
+      panel.classList.remove('active')
       panel.hidden = true
       document.querySelector('.download-spinner').classList.remove('spinning')
       resetProgress()
     }, 1700)
-  } else if (progress.phase === 'error') {
-    panel.hidden = true
-    document.querySelector('.download-spinner').classList.remove('spinning')
-    resetProgress()
-    extractionSample = null
+    return
+  }
+
+  if (progress.phase === 'cancelled') {
+    setProgressPhase('cancelled')
+    stopRetryCountdown()
+    setCancelVisible(false)
+    label.textContent = t('downloadCancelled')
+    footnote.textContent = t('downloadCancelledHint', { size: formatBytes(progress.received || 0) })
+    size.textContent = ''
+    speed.textContent = ''
+    eta.textContent = ''
+    percent.textContent = '—'
+    bar.classList.remove('indeterminate', 'retrying')
+    setTimeout(() => {
+      panel.classList.remove('active')
+      panel.hidden = true
+      document.querySelector('.download-spinner').classList.remove('spinning')
+      resetProgress()
+    }, 2600)
+    return
+  }
+
+  if (progress.phase === 'error') {
+    setProgressPhase('error')
+    stopRetryCountdown()
+    setCancelVisible(false)
+    // Keep the panel up with the reason instead of vanishing, so a failure on a weak link says
+    // what went wrong and how much of the download survived.
+    label.textContent = t('downloadFailed')
+    footnote.textContent = progress.message || t('downloadError')
+    if (progress.received > 0) {
+      size.textContent = formatBytes(progress.received)
+      const hint = document.getElementById('progress-hint')
+      if (hint) hint.textContent = t('downloadFailedHint', { size: formatBytes(progress.received) })
+    }
+    speed.textContent = ''
+    eta.textContent = ''
+    bar.classList.remove('indeterminate', 'retrying')
+    setTimeout(() => {
+      panel.classList.remove('active')
+      panel.hidden = true
+      document.querySelector('.download-spinner').classList.remove('spinning')
+      resetProgress()
+    }, 6000)
   }
 }
 
@@ -1350,13 +1507,17 @@ async function downloadVersion(version, options = {}) {
     if (!confirmed) return
   }
   busy = true
-  document.getElementById('download-progress').hidden = false
+  downloadingVersionId = version.id
+  const panel = document.getElementById('download-progress')
+  panel.hidden = false
+  panel.classList.add('active')
   document.getElementById('progress-message').textContent = t('downloadStarted')
   document.getElementById('progress-footnote').textContent = ''
   document.getElementById('progress-size').textContent = '0 B'
   document.getElementById('progress-speed').textContent = '—'
   document.getElementById('progress-eta').textContent = t('starting')
-  document.getElementById('progress-percent').textContent = '0%'
+  document.getElementById('progress-percent').textContent = '—'
+  document.getElementById('progress-cancel').hidden = false
   renderSelectedVersion()
   resetProgress()
   try {
@@ -1364,10 +1525,14 @@ async function downloadVersion(version, options = {}) {
     renderInstallState(await window.aocLauncher.getModStatus())
     notify(t('installedVersionMessage', { name: version.name }))
   } catch (error) {
-    document.getElementById('download-progress').hidden = true
+    // The progress panel stays up with the reason and the surviving byte count: on a weak link
+    // the most useful thing the user can see is how much will not be downloaded again.
     if (error.message === 'ARCHIVE_TOO_LARGE') showMessage(t('downloadErrorTitle'), t('archiveTooLarge'))
-    else notify(error.message || t('downloadError'), true)
+    else if (!/отмен/i.test(error.message || '')) notify(error.message || t('downloadError'), true)
+    else notify(t('downloadCancelled'), true)
   } finally {
+    downloadingVersionId = null
+    document.getElementById('progress-cancel').disabled = false
     busy = false
     renderSelectedVersion()
   }
@@ -1521,6 +1686,15 @@ document.getElementById('open-crash-log-folder').addEventListener('click', async
 })
 
 window.aocLauncher.onDownloadProgress(handleProgress)
+
+document.getElementById('progress-cancel').addEventListener('click', () => {
+  if (!downloadingVersionId) return
+  stopRetryCountdown()
+  document.getElementById('progress-cancel').disabled = true
+  window.aocLauncher.cancelDownload(downloadingVersionId).catch(() => {
+    document.getElementById('progress-cancel').disabled = false
+  })
+})
 window.aocLauncher.onGameDiscovery(({ error } = {}) => {
   if (error) notify(t('gameSearchFailed', { error }), true)
   refreshInstallStateOnly()
@@ -1563,11 +1737,6 @@ const updateCard = {
   command: document.getElementById('startup-update-command'),
   note: document.getElementById('startup-update-note'),
   reveal: document.getElementById('startup-update-reveal')
-}
-
-function formatBytes(bytes) {
-  if (!bytes) return ''
-  return bytes >= 1048576 ? (bytes / 1048576).toFixed(1) + ' MB' : Math.round(bytes / 1024) + ' KB'
 }
 
 function setUpdateProgress({ percent, received, total, phase }) {
@@ -1719,31 +1888,24 @@ async function runStartupSequence() {
   startupMessage.textContent = t('startupInitializing')
   await wait(340)
   startupMessage.textContent = t('startupLoadingVersions')
+  // Reading the local version list is instant; everything that touches the network is fired and
+  // forgotten. On a 100 KB/s link the old code kept the splash up for the full update check,
+  // which read as a hang rather than as a slow connection.
   const versionsReady = window.aocLauncher.getModStatus().catch(error => {
     console.warn('Could not read the mod list during startup:', error)
   })
-  const modUpdates = checkModUpdates()
-  await wait(300)
-  startupMessage.textContent = t('startupCheckingUpdates')
-  const repoUpdateCheck = window.aocLauncher.checkRepoUpdate().catch(error => {
-    console.warn('Repository update check failed:', error)
-    return null
-  })
-  await Promise.race([
-    Promise.all([versionsReady, modUpdates]),
-    wait(8000)
-  ])
-  // Await the real answer: the old Promise.race silently dropped slow checks,
-  // so a real update could go unannounced on a slow connection.
-  const repoUpdate = await repoUpdateCheck
-  if (repoUpdate?.available) {
-    showStartupUpdate(repoUpdate)
-    return
-  }
+  await versionsReady
   startupMessage.textContent = t('startupReady')
   const remaining = minimumDuration - (Date.now() - startedAt)
   if (remaining > 0) await wait(remaining)
   hideStartupScreen()
+
+  checkModUpdates()
+  window.aocLauncher.checkRepoUpdate().then(repoUpdate => {
+    if (repoUpdate?.available) showStartupUpdate(repoUpdate)
+  }).catch(error => {
+    console.warn('Repository update check failed:', error)
+  })
 }
 
 document.addEventListener('keydown', event => {

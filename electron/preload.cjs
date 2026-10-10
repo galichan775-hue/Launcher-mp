@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('aocLauncher', Object.freeze({
   sendCrashReport: report => ipcRenderer.invoke('launcher:send-crash-report', report),
   checkModUpdates: () => ipcRenderer.invoke('mod:check-updates'),
   downloadMod: versionId => ipcRenderer.invoke('mod:download', versionId),
+  cancelDownload: versionId => ipcRenderer.invoke('mod:cancel-download', versionId),
   deleteMod: versionId => ipcRenderer.invoke('mod:delete', versionId),
   launchMod: versionId => ipcRenderer.invoke('mod:launch', versionId),
   stopMod: versionId => ipcRenderer.invoke('mod:stop', versionId),

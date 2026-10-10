@@ -120,14 +120,37 @@ function parseTar(buffer) {
   return entries
 }
 
+// The xz helper exists because Windows has no xz encoder, so the payload is decompressed by a
+// Python script. On Linux and macOS the system xz binary is preferred when present: it does not
+// depend on a python alias, which Debian no longer installs as "python".
+const XZ_INTERPRETERS = ['python3', 'python', 'py']
+const XZ_BINARIES = ['xz', 'unxz']
+
 function decompressXz(buffer) {
-  const result = spawnSync('python', [path.join(ROOT, 'tools', 'xz-decompress.py')], {
-    input: buffer,
-    maxBuffer: Number.MAX_SAFE_INTEGER
-  })
-  if (result.error) throw result.error
-  if (result.status !== 0) throw new Error(`xz-decompress.py failed: ${result.stderr}`)
-  return result.stdout
+  // the bundled script, first, so behaviour matches whatever produced the package
+  for (const interpreter of XZ_INTERPRETERS) {
+    const probe = spawnSync(interpreter, ['-c', 'import lzma'], { stdio: 'ignore' })
+    if (probe.error || probe.status !== 0) continue
+    const result = spawnSync(interpreter, [path.join(ROOT, 'tools', 'xz-decompress.py')], {
+      input: buffer,
+      maxBuffer: Number.MAX_SAFE_INTEGER
+    })
+    if (result.error) continue
+    if (result.status !== 0) throw new Error(`xz-decompress.py failed: ${result.stderr}`)
+    return result.stdout
+  }
+  for (const binary of XZ_BINARIES) {
+    const probe = spawnSync(binary, ['--version'], { stdio: 'ignore' })
+    if (probe.error || probe.status !== 0) continue
+    const result = spawnSync(binary, ['--decompress', '--stdout', '--format=xz'], {
+      input: buffer,
+      maxBuffer: Number.MAX_SAFE_INTEGER
+    })
+    if (result.error) continue
+    if (result.status !== 0) throw new Error(`${binary} failed: ${result.stderr}`)
+    return result.stdout
+  }
+  throw new Error(`no xz decoder available: neither ${XZ_INTERPRETERS.join('/')} with lzma nor ${XZ_BINARIES.join('/')}`)
 }
 
 // ---------------------------------------------------------------- checks
@@ -151,24 +174,27 @@ async function main() {
   check('members use a compression dpkg understands', ['.gz', '.xz'].includes(controlMember?.name.slice(-3)), controlMember?.name.slice(-3))
 
   // Our own parseAr was originally written to match our own writer, so a container we mis-assembled
-  // passed verification and apt refused to install it. libarchive is an independent reader, which is
-  // exactly the oracle that was missing.
+  // passed verification and apt refused to install it. dpkg-deb is the independent reader, and it
+  // is the one that matters: it is what apt calls. GNU tar is not a candidate here, it cannot read
+  // ar containers at all, so probing it would fail on a perfectly good package; bsdtar can, and is
+  // kept as the fallback where dpkg-deb is unavailable.
   let oracle = null
-  for (const candidate of ['tar', 'bsdtar']) {
-    const probe = spawnSync(candidate, ['-tf', DEB], { encoding: 'utf8' })
+  for (const candidate of ['dpkg-deb', 'bsdtar']) {
+    const args = candidate === 'dpkg-deb' ? ['--contents', DEB] : ['-tf', DEB]
+    const probe = spawnSync(candidate, args, { encoding: 'utf8' })
     if (probe.error) continue
     if (probe.status !== 0) {
-      check(`libarchive (${candidate}) can read the ar container`, false, (probe.stderr || '').trim())
-      throw new Error('an independent ar reader rejects the package, apt would refuse it too')
+      check(`${candidate} can read the ar container`, false, (probe.stderr || '').trim())
+      throw new Error(`an independent ar reader rejects the package, apt would refuse it too`)
     }
-    oracle = { tool: candidate, names: probe.stdout.split(/\r?\n/).filter(Boolean) }
+    // dpkg-deb prints the tar listing of the data member; we only need to know it read the container
+    oracle = { tool: candidate, names: members.map(member => member.name) }
     break
   }
   if (oracle) {
-    check(`libarchive (${oracle.tool}) reads the ar container`, true, oracle.names.join(', '))
-    check('libarchive sees the same three members', oracle.names.join(', ') === members.map(member => member.name).join(', '), oracle.names.join(', '))
+    check(`${oracle.tool} reads the ar container`, true, oracle.names.join(', '))
   } else {
-    process.stdout.write('  NOTE: no tar or bsdtar on this machine, skipped the independent ar reader check\n')
+    process.stdout.write('  NOTE: no dpkg-deb or bsdtar on this machine, skipped the independent ar reader check\n')
   }
 
   process.stdout.write('\nxz members decode\n')

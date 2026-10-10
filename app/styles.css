@@ -440,9 +440,14 @@ a.community-link:hover { border-color: #6d7177; background: #303236; color: whit
 .download-progress { margin-top: 15px; padding: 14px; border: 1px solid #c4cfe01b; border-radius: 11px; background: radial-gradient(ellipse at 10% -30%,#8293b522,transparent 65%),linear-gradient(130deg,#282b32,#22242a); box-shadow: inset 0 1px #ffffff0a,0 10px 28px #0002; }
 .download-topline,.download-title,.download-metrics { display: flex; align-items: center; }
 .download-topline { justify-content: space-between; gap: 12px; }
-.download-title { min-width: 0; gap: 9px; color: #e2e4e9; font-size: 10px; font-weight: 550; }
+.download-topline-right { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+.download-title { min-width: 0; gap: 9px; color: #e2e4e9; font-size: 11px; font-weight: 550; }
 .download-title>span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.progress-percent { color: #f0f1f4; font-size: 12px; font-variant-numeric: tabular-nums; font-weight: 650; }
+.progress-percent { color: #f0f1f4; font-size: 14px; font-variant-numeric: tabular-nums; font-weight: 650; }
+.progress-cancel { height: 22px; padding: 0 9px; border: 1px solid #ffffff1f; border-radius: 6px; background: #ffffff0d; color: #d6dae2; font: inherit; font-size: 10px; cursor: pointer; transition: background .12s,border-color .12s; }
+.progress-cancel:hover { border-color: #ffffff33; background: #ffffff1a; }
+.progress-cancel:active { background: #ffffff24; }
+.progress-cancel[hidden] { display: none; }
 .download-spinner { width: 13px; height: 13px; flex: 0 0 13px; border: 2px solid #777e8a55; border-top-color: #eef0f5; border-radius: 50%; }
 .download-spinner.spinning { animation: spinner-turn .8s linear infinite; }
 @keyframes spinner-turn { to { transform: rotate(360deg); } }
@@ -450,10 +455,12 @@ a.community-link:hover { border-color: #6d7177; background: #303236; color: whit
 .progress-track>span { position: relative; z-index: 1; width: 100%; transform: scaleX(0); transform-origin: left center; background: linear-gradient(90deg,#929cac 0%,#e6e8ec 44%,#d7cabb 74%,#aebad0); box-shadow: 0 0 15px #c7d2e257; transition: none; will-change: transform; }
 .progress-track>span.indeterminate::after { position: absolute; inset: 0; background: linear-gradient(100deg,transparent,#ffffffae 48%,transparent); animation: progress-glint .82s linear infinite; content: ""; }
 @keyframes progress-glint { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+.progress-track>span.retrying { animation: progress-pulse 1.1s ease-in-out infinite; }
+@keyframes progress-pulse { 50% { opacity: .45; } }
 .progress-track>i { position: absolute; z-index: 2; top: -4px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 0 12px #e8eef7b3; transform: translateX(-50%); transition: left .1s linear; }
-.download-metrics { justify-content: space-between; gap: 8px; margin-top: 10px; color: #b1b6c0; font-size: 9px; font-variant-numeric: tabular-nums; }
+.download-metrics { justify-content: space-between; gap: 8px; margin-top: 10px; color: #c2c7d1; font-size: 10.5px; font-variant-numeric: tabular-nums; }
 .download-metrics span { white-space: nowrap; }
-.progress-footnote { margin-top: 8px; color: #858b98; font-size: 9px; }
+.progress-footnote { margin-top: 8px; color: #969dab; font-size: 10.5px; line-height: 1.4; }
 .download-destination { border-color: #ffffff14; background: linear-gradient(110deg,#292b31,#222328); }
 .select-game-folder,.reset-game-folder { min-height: 31px; height: 31px; flex: 0 0 auto; padding: 0 9px; font-size: 9px; }
 .reset-game-folder { color: #d8bbbb; }
