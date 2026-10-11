@@ -173,7 +173,7 @@ function hashFile(file) {
  * body in with backpressure and report progress. Rejects with a retryable DownloadError on any
  * stall or transport failure so the caller can reconnect instead of losing the whole transfer.
  */
-async function transferOnce({ url, partialPath, from, signal, onProgress, attempt, speed }) {
+async function transferOnce({ url, partialPath, from, signal, onProgress, attempt, speed, knownTotal = 0 }) {
   const headers = {
     'User-Agent': USER_AGENT,
     // Without this undici asks for gzip and transparently inflates the body, so content-length
@@ -199,7 +199,7 @@ async function transferOnce({ url, partialPath, from, signal, onProgress, attemp
     const match = range && /\/(\d+)\s*$/.exec(range)
     total = match ? Number(match[1]) : from + declared
   } else {
-    total = declared
+    total = declared || knownTotal
   }
   if (!resumed && from > 0) await fsp.rm(partialPath, { force: true })
 
@@ -281,6 +281,13 @@ async function transferOnce({ url, partialPath, from, signal, onProgress, attemp
       if (pending) await pending
       speed.add(value.byteLength)
       report(false)
+      // codeload never sends content-length and frequently drops the socket the instant the last
+      // byte is written instead of ending the chunked stream cleanly. Once the published size has
+      // arrived there is nothing left to fetch: stop here rather than let the stall watchdog treat
+      // that teardown as a dropped connection and throw an otherwise-complete 600 MB transfer away.
+      // Only when the server declared no length of its own, so an explicit (possibly larger) length
+      // is always drained to its real end.
+      if (knownTotal && !declared && received >= knownTotal) break
     }
     assertNotCancelled(signal)
     if (abortError) throw abortError
@@ -348,15 +355,29 @@ async function downloadFile(options) {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     assertNotCancelled(signal)
     let from = fileSize(partialPath)
+    // A previous run may already hold the entire archive but lost the link right before the file
+    // was promoted. Hash what is on disk and keep it if it is intact - re-downloading hundreds of
+    // megabytes because the final packet was late is the exact failure this downloader exists to
+    // prevent. codeload ignores Range, so a discarded partial is always a full restart from zero.
+    if (from > 0 && total && from >= total && expectedSha256) {
+      const digest = await hashFile(partialPath)
+      if (digest.toLowerCase() === String(expectedSha256).toLowerCase()) {
+        rememberTotal(metaPath, url, total)
+        await fsp.rename(partialPath, destination)
+        emit({ received: from, total, speedBytesPerSecond: speed.bytesPerSecond, attempt, done: true })
+        return { path: destination, bytes: from, total, attempts: attempt, verified: true }
+      }
+    }
     if (from > 0 && total && from >= total) {
-      // More bytes on disk than the archive has: the partial belongs to another build.
+      // More bytes on disk than the archive has, or a complete file that failed verification: the
+      // partial belongs to another build.
       await clearPartial()
       from = 0
     }
     if (total) emit({ received: from, total, speedBytesPerSecond: speed.bytesPerSecond, attempt, starting: true })
 
     try {
-      const result = await transferOnce({ url, partialPath, from, signal, onProgress, attempt, speed })
+      const result = await transferOnce({ url, partialPath, from, signal, onProgress, attempt, speed, knownTotal: published })
       const bytes = fileSize(partialPath)
       if (published && bytes < published) {
         // A short body on a chunked response is a truncated transfer, not a smaller archive.

@@ -142,7 +142,7 @@
     },
     {
       "id": "addon-plus",
-      "version": "1.0",
+      "version": "3.0",
       "name": "Addon+ Age of History 2",
       "tagline": "Одиночный мод Addon+ для Age of History II",
       "taglineEn": "Addon+ singleplayer mod for Age of History II",
@@ -151,10 +151,11 @@
       "kind": "singleplayer",
       "entryPoint": "AoC2.jar",
       "repository": "galichan775-hue/Addon-",
-      "commit": "1929f91d6f7fbd82c5344a9b3ff56e8ce62e675c",
+      "commit": "709925b762e9674b96d4f0841ef2dddbfc38efb0",
       "archive": {
-        "bytes": 619518309,
-        "sha256": "ba232a2ec5d3c47e45699fa2b57189f287f8ad16f32803d8bc2180585d5ad06b"
+        "url": "https://github.com/galichan775-hue/Addon-/releases/download/addon-plus-3.0/AddonPlus.zip",
+        "bytes": 608286724,
+        "sha256": "f9f984dc2025f5677e8ceff4d189bdffacccae573cf85f0e6c2bc3e6bcfb121c"
       },
       "banner": "assets/versions/addon-plus/banner.webp",
       "icon": "assets/branding/logo.svg",
@@ -163,7 +164,7 @@
     }
   ],
   "updater": {
-    "packageBytes": 89652640,
-    "sha256": "90c90db509cbab98d6fd90938088284ec56df7d7f31e5cab472998188d2c8e3b"
+    "packageBytes": 89584680,
+    "sha256": "f383cd65a43bc3f33f7b250df8aa43fd85b45196e7e2790edf84bdf260383410"
   }
 }

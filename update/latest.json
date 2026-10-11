@@ -1,0 +1,15 @@
+{
+  "version": "1.2.14",
+  "artifact": {
+    "linux": {
+      "fileName": "AOC-2-Multiplayer-linux-x64.deb",
+      "bytes": 89582672,
+      "sha256": "c0a9888d4370b2cc449e25c479f3696ee5ac5b2f1dcf92c8c56dab8850e1c61e"
+    },
+    "win32": {
+      "fileName": "AOC-2-Multiplayer-Setup.exe",
+      "bytes": 100185132,
+      "sha256": "16a5e9cef825e38a1a6c31f0b88ad0ad2ab792203f4547407a2fb2c97f423e63"
+    }
+  }
+}

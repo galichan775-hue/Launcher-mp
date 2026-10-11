@@ -156,15 +156,30 @@ async function applyRepoUpdate() {
   // Nothing to do is a normal outcome, not a failure: the prompt must simply close.
   if (!latest || !semverGt(latest, current)) return { started: false, upToDate: true, current }
   const dest = path.join(app.getPath('temp'), platform.UPDATER_ARTIFACT)
-  // The package is 90 MB. It used to be fetched with a 30 s socket timeout, no retry and no
+  // The package is ~90 MB. It used to be fetched with a 30 s socket timeout, no retry and no
   // resume, which is exactly the transfer that dies halfway on a slow or mobile link.
-  // The digest in the config is what stops a tampered or truncated 90 MB package from being
-  // handed to the shell installer, so it is verified whenever the config publishes one.
+  // The digest is what stops a tampered or truncated package from being handed to the shell
+  // installer. It must come from the freshly fetched manifest in the repository, not from this
+  // build: the sha baked into an installed copy goes stale as soon as a next release replaces
+  // the artifact, and a stale expectation would reject every following update.
+  let expectedTotal = launcherConfig.updater?.packageBytes || 0
+  let expectedSha256 = launcherConfig.updater?.sha256 || ''
+  try {
+    const manifest = JSON.parse(await fetchText(RAW_BASE + 'update/latest.json'))
+    const entry = manifest?.artifact?.[process.platform]
+    if (entry && entry.fileName === platform.UPDATER_ARTIFACT) {
+      if (Number.isFinite(entry.bytes) && entry.bytes > 0) expectedTotal = entry.bytes
+      if (/^[a-f0-9]{64}$/i.test(entry.sha256 || '')) expectedSha256 = entry.sha256
+    }
+  } catch (error) {
+    // A missing or broken manifest is not fatal: the bundled values (if any) still gate the download.
+    void error
+  }
   await downloadToFile({
     url: RAW_BASE + platform.UPDATER_ARTIFACT,
     destination: dest,
-    expectedTotal: launcherConfig.updater?.packageBytes || 0,
-    expectedSha256: launcherConfig.updater?.sha256 || '',
+    expectedTotal,
+    expectedSha256,
     onProgress: ({ received, total, speedBytesPerSecond, attempt, retrying, retryInMs }) => {
       broadcastUpdateProgress({
         phase: 'download',
@@ -856,7 +871,7 @@ function extractModArchive(archivePath, destination, onProgress) {
     const processEntry = async entry => {
       fileCount += 1
       expandedSize += entry.uncompressedSize
-      if (fileCount > 100000 || expandedSize > 2 * 1024 * 1024 * 1024) {
+      if (fileCount > 250000 || expandedSize > 4 * 1024 * 1024 * 1024) {
         throw new Error('Архив мода превышает безопасный лимит распаковки.')
       }
       const relativePath = entry.fileName.replace(/\\/g, '/')
@@ -1152,10 +1167,20 @@ async function installVersionFromCommit(event, versionId, requestedCommit) {
     await fsp.rm(stagingDirectory, { recursive: true, force: true })
     await fsp.mkdir(stagingDirectory, { recursive: true })
 
-    const archiveUrl = archive.url
-      ? String(archive.url).replace('{commit}', commit)
+    // The pinned archive size and digest in launcher-config.json describe one exact build: the
+    // archive of the version's configured commit (or the release asset that commit was published
+    // as). A commit override - a rollback or an update installed from the UI - is a different
+    // archive, so its size and digest are unknown and must not be used to reject the transfer as
+    // truncated. A fixed release URL (no {commit} placeholder) likewise only matches the
+    // configured commit, so an override falls back to the codeload source archive instead.
+    const configuredCommit = typeof version.commit === 'string' ? version.commit.toLowerCase() : ''
+    const usesConfiguredArchive = Boolean(configuredCommit) && commit.toLowerCase() === configuredCommit
+    const urlTemplate = typeof archive.url === 'string' ? archive.url : ''
+    const archiveUrl = urlTemplate && (usesConfiguredArchive || urlTemplate.includes('{commit}'))
+      ? urlTemplate.replace('{commit}', commit)
       : `https://codeload.github.com/${version.repository}/zip/${commit}`
-    const expectedTotal = Number(archive.bytes) || 0
+    const expectedTotal = usesConfiguredArchive ? (Number(archive.bytes) || 0) : 0
+    const expectedSha256 = usesConfiguredArchive ? (archive.sha256 || '') : ''
     if (expectedTotal > MAX_ARCHIVE_BYTES) {
       throw new Error('ARCHIVE_TOO_LARGE')
     }
@@ -1166,7 +1191,7 @@ async function installVersionFromCommit(event, versionId, requestedCommit) {
       partialPath,
       metaPath,
       expectedTotal,
-      expectedSha256: archive.sha256 || '',
+      expectedSha256,
       signal: controller.signal,
       onProgress: progress => {
         if (progress.received > MAX_ARCHIVE_BYTES) {
